@@ -1,0 +1,377 @@
+# INT-01A Smoke Test Result
+
+- Runner: INT-01A_P0_v1.0
+- Run ID: int01a-2026-07-01T13-17-06-134Z-a68277ff
+- Status: **FAIL**
+- Started: 2026-07-01T13:17:06.136Z
+- Ended: 2026-07-01T13:17:06.824Z
+- NODE_ENV: integration
+- DATABASE_URL: postgres://postgres:***@127.0.0.1:15432/local_final_gate
+
+## Step Summary
+
+| Step | Status | Duration ms | Title |
+|---|---:|---:|---|
+| INT01A-00 | PASS | 1 | Required environment is present and integration-only |
+| INT01A-01 | PASS | 60 | Database connectivity uses real PostgreSQL |
+| INT01A-02 | PASS | 57 | Migrations already applied / freeze-scope tables exist |
+| INT01A-03 | PASS | 52 | MD-01 seed/preseed real master data exists |
+| INT01A-04 | PASS | 5 | Approved module surface adapter/commands are bound |
+| INT01A-05 | PASS | 373 | Post Sales / Delivery baseline through approved surface |
+| INT01A-06 | FAIL | 61 | Post Purchase / GRNI baseline through approved surface |
+
+## Failures / Open Issues
+
+### INT01A-06 — Post Purchase / GRNI baseline through approved surface
+
+- Error: [INT01B] Approved module surface not wired in v1.1 patch scope: postPurchaseGrni
+
+```json
+{
+  "nextBlocker": "INT01A_PURCHASE_GRNI_WIRING_REQUIRED"
+}
+```
+
+## Full Evidence
+
+```json
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-07-01T13-17-06-134Z-a68277ff",
+  "status": "FAIL",
+  "startedAt": "2026-07-01T13:17:06.136Z",
+  "endedAt": "2026-07-01T13:17:06.824Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "nodeEnv": "integration",
+    "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:17:06.136Z",
+      "endedAt": "2026-07-01T13:17:06.137Z",
+      "durationMs": 1,
+      "evidence": {
+        "requiredEnv": [
+          "DATABASE_URL",
+          "NODE_ENV",
+          "MD01_COMPANY_ID",
+          "MD01_INVENTORY_ACCOUNT_ID",
+          "MD01_COGS_ACCOUNT_ID",
+          "MD01_REVENUE_ACCOUNT_ID",
+          "MD01_EXPENSE_ACCOUNT_ID"
+        ],
+        "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-01",
+      "title": "Database connectivity uses real PostgreSQL",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:17:06.137Z",
+      "endedAt": "2026-07-01T13:17:06.197Z",
+      "durationMs": 60,
+      "evidence": {
+        "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+        "database": "local_final_gate",
+        "schema": "public"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-02",
+      "title": "Migrations already applied / freeze-scope tables exist",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:17:06.197Z",
+      "endedAt": "2026-07-01T13:17:06.254Z",
+      "durationMs": 57,
+      "evidence": {
+        "migrationInfo": {
+          "migrationTable": null,
+          "rows": null,
+          "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+        },
+        "resolvedTables": {
+          "companies": "public.companies",
+          "accounts": "public.accounts",
+          "customers": "public.customers",
+          "suppliers": "public.suppliers",
+          "items": "public.items",
+          "warehouses": "public.warehouses",
+          "accountingDocuments": "public.journal_entries",
+          "glEntries": "public.gl_entries",
+          "vatLedger": "public.tax_ledger_entries",
+          "arLedger": "public.ar_ap_ledger_entries",
+          "apLedger": "public.ar_ap_ledger_entries",
+          "inventoryLedger": "public.inventory_ledger_entries",
+          "stockBalances": "public.stock_balances",
+          "salesInvoices": "public.sales_invoices",
+          "purchaseReceipts": "public.purchase_receipts",
+          "purchaseInvoices": "public.purchase_invoices",
+          "migrations": null,
+          "arapAllocations": "public.ar_ap_allocations",
+          "deliveries": "public.delivery_notes"
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-03",
+      "title": "MD-01 seed/preseed real master data exists",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:17:06.254Z",
+      "endedAt": "2026-07-01T13:17:06.306Z",
+      "durationMs": 52,
+      "evidence": {
+        "companyId": "ce49ecec-99ba-4843-8fd4-d3c96ccb1634",
+        "companyExists": true,
+        "masterData": {
+          "customers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "suppliers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "items": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "warehouses": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          }
+        },
+        "accountChecks": {
+          "inventory": {
+            "id": "026edcf9-4d76-4df9-a3af-a882629ff9a9",
+            "exists": true
+          },
+          "cogs": {
+            "id": "89fde8da-ccb7-4125-8059-4628b55f53f3",
+            "exists": true
+          },
+          "revenue": {
+            "id": "879c2fcb-5c17-45ae-973a-34b0349f48e5",
+            "exists": true
+          },
+          "expense": {
+            "id": "b6c47521-e864-4a57-b862-73935adc5190",
+            "exists": true
+          },
+          "grni": {
+            "id": "bc08c7fc-de89-4acf-97ed-d262f2b88484",
+            "exists": true
+          }
+        },
+        "grniSubtype": {
+          "subtypeColumn": "account_subtype",
+          "goodsReceivedNotInvoicedRows": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-04",
+      "title": "Approved module surface adapter/commands are bound",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:17:06.306Z",
+      "endedAt": "2026-07-01T13:17:06.311Z",
+      "durationMs": 5,
+      "evidence": {
+        "mode": "module",
+        "adapterPath": "./src/int01a/int01a-approved-surface-adapter-int01c.mjs",
+        "commandMode": false
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-05",
+      "title": "Post Sales / Delivery baseline through approved surface",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:17:06.390Z",
+      "endedAt": "2026-07-01T13:17:06.763Z",
+      "durationMs": 373,
+      "evidence": {
+        "result": {
+          "ok": true,
+          "surface": "EW-03 Sales/Delivery approved service surface",
+          "company_id": "ce49ecec-99ba-4843-8fd4-d3c96ccb1634",
+          "posting_date": "2026-07-01",
+          "delivery_note_id": "07df4f56-958c-495e-9065-5c17afa3b00d",
+          "sales_invoice_id": "9c9c1fe1-8424-476a-9eeb-ea99f85f10bd",
+          "accountingDocumentId": "94fcbcfe-1937-4841-8690-10cc351eda98",
+          "accountingDocumentIds": [
+            "94fcbcfe-1937-4841-8690-10cc351eda98"
+          ],
+          "delivery_post_result": {
+            "skipped": true,
+            "error": "[INT01B] SalesPostingService did not expose a compatible posting method or all posting attempts failed"
+          },
+          "invoice_post_result": {
+            "method": "postSalesInvoice",
+            "result": {
+              "status": "posted",
+              "id": "9c9c1fe1-8424-476a-9eeb-ea99f85f10bd",
+              "journal_entry_id": "94fcbcfe-1937-4841-8690-10cc351eda98"
+            }
+          },
+          "wiring": {
+            "transactionManager": "PgTransactionManager.withTransaction",
+            "salesInvoiceRepository": "PostgresSalesInvoiceRepository",
+            "deliveryNoteRepository": "PostgresDeliveryNoteRepository",
+            "salesPostingService": "SalesPostingService",
+            "glWriter": "EW-01 coreAccounting.postAccountingDocument only"
+          },
+          "__originalGlRowsBeforeCancel": [
+            {
+              "id": "13a139df-2a47-4053-97ab-fb634bd7c973",
+              "company_id": "ce49ecec-99ba-4843-8fd4-d3c96ccb1634",
+              "journal_entry_id": "94fcbcfe-1937-4841-8690-10cc351eda98",
+              "journal_entry_line_id": "ea8adbfe-2314-4974-9df4-e524da434a99",
+              "account_id": "026edcf9-4d76-4df9-a3af-a882629ff9a9",
+              "posting_date": "2026-06-30T17:00:00.000Z",
+              "debit_amount": "1100",
+              "credit_amount": "0",
+              "currency": "VND",
+              "source_document_type": "sales_invoice",
+              "source_document_id": "9c9c1fe1-8424-476a-9eeb-ea99f85f10bd",
+              "source_document_no": "INT01A-SI-1782911826573",
+              "source_document_line_id": null,
+              "party_type": null,
+              "party_id": "00000000-0000-4000-8000-000000000101",
+              "warehouse_id": null,
+              "inventory_item_id": null,
+              "inventory_ledger_entry_id": null,
+              "tax_metadata": {},
+              "idempotency_key": "int01a-sales-delivery-1782911826517-de8e70cd-d9d3-4aab-abdd-0d8cbf9d61c6:post-invoice",
+              "created_at": "2026-07-01T13:16:56.464Z"
+            },
+            {
+              "id": "63eea932-fcd7-453b-b5e7-6bc5453f05f3",
+              "company_id": "ce49ecec-99ba-4843-8fd4-d3c96ccb1634",
+              "journal_entry_id": "94fcbcfe-1937-4841-8690-10cc351eda98",
+              "journal_entry_line_id": "2c827ada-5689-4581-956f-fd181a685296",
+              "account_id": "bc08c7fc-de89-4acf-97ed-d262f2b88484",
+              "posting_date": "2026-06-30T17:00:00.000Z",
+              "debit_amount": "0",
+              "credit_amount": "100",
+              "currency": "VND",
+              "source_document_type": "sales_invoice",
+              "source_document_id": "9c9c1fe1-8424-476a-9eeb-ea99f85f10bd",
+              "source_document_no": "INT01A-SI-1782911826573",
+              "source_document_line_id": null,
+              "party_type": null,
+              "party_id": "00000000-0000-4000-8000-000000000101",
+              "warehouse_id": null,
+              "inventory_item_id": null,
+              "inventory_ledger_entry_id": null,
+              "tax_metadata": {},
+              "idempotency_key": "int01a-sales-delivery-1782911826517-de8e70cd-d9d3-4aab-abdd-0d8cbf9d61c6:post-invoice",
+              "created_at": "2026-07-01T13:16:56.464Z"
+            },
+            {
+              "id": "db63ea51-4cd8-468d-829a-d93cd6ba1e53",
+              "company_id": "ce49ecec-99ba-4843-8fd4-d3c96ccb1634",
+              "journal_entry_id": "94fcbcfe-1937-4841-8690-10cc351eda98",
+              "journal_entry_line_id": "73d35b77-3fc3-4ca1-b03f-cf5ecfd48220",
+              "account_id": "879c2fcb-5c17-45ae-973a-34b0349f48e5",
+              "posting_date": "2026-06-30T17:00:00.000Z",
+              "debit_amount": "0",
+              "credit_amount": "1000",
+              "currency": "VND",
+              "source_document_type": "sales_invoice",
+              "source_document_id": "9c9c1fe1-8424-476a-9eeb-ea99f85f10bd",
+              "source_document_no": "INT01A-SI-1782911826573",
+              "source_document_line_id": null,
+              "party_type": null,
+              "party_id": "00000000-0000-4000-8000-000000000101",
+              "warehouse_id": null,
+              "inventory_item_id": null,
+              "inventory_ledger_entry_id": null,
+              "tax_metadata": {},
+              "idempotency_key": "int01a-sales-delivery-1782911826517-de8e70cd-d9d3-4aab-abdd-0d8cbf9d61c6:post-invoice",
+              "created_at": "2026-07-01T13:16:56.464Z"
+            }
+          ]
+        },
+        "deltas": {
+          "glEntries": {
+            "before": 0,
+            "after": 9,
+            "delta": 9
+          },
+          "salesInvoices": {
+            "before": 0,
+            "after": 1,
+            "delta": 1
+          },
+          "arLedger": {
+            "before": 0,
+            "after": 1,
+            "delta": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-06",
+      "title": "Post Purchase / GRNI baseline through approved surface",
+      "status": "FAIL",
+      "startedAt": "2026-07-01T13:17:06.763Z",
+      "endedAt": "2026-07-01T13:17:06.824Z",
+      "durationMs": 61,
+      "evidence": null,
+      "error": {
+        "name": "Int01bPendingSurfaceError",
+        "message": "[INT01B] Approved module surface not wired in v1.1 patch scope: postPurchaseGrni",
+        "details": {
+          "nextBlocker": "INT01A_PURCHASE_GRNI_WIRING_REQUIRED"
+        }
+      }
+    }
+  ],
+  "openIssues": [
+    {
+      "step": "INT01A-06",
+      "title": "Post Purchase / GRNI baseline through approved surface",
+      "error": {
+        "name": "Int01bPendingSurfaceError",
+        "message": "[INT01B] Approved module surface not wired in v1.1 patch scope: postPurchaseGrni",
+        "details": {
+          "nextBlocker": "INT01A_PURCHASE_GRNI_WIRING_REQUIRED"
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "db": {
+      "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+      "database": "local_final_gate",
+      "schema": "public"
+    },
+    "migrationInfo": {
+      "migrationTable": null,
+      "rows": null,
+      "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+    }
+  },
+  "terminalError": {
+    "name": "Int01bPendingSurfaceError",
+    "message": "[INT01B] Approved module surface not wired in v1.1 patch scope: postPurchaseGrni",
+    "details": {
+      "nextBlocker": "INT01A_PURCHASE_GRNI_WIRING_REQUIRED"
+    }
+  }
+}
+```

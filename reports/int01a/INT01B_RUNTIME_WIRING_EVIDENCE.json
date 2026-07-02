@@ -1,0 +1,95 @@
+{
+  "package": "INT-01B_COMPANY_SETTINGS_RUNTIME_PATH_P0_v1_3",
+  "checkedAt": "2026-06-30T14:38:29.074Z",
+  "files": {
+    "bridgePath": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01b-post-sales-delivery-wiring.mjs",
+    "adapterPath": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-approved-surface-adapter.mjs",
+    "repoPath": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\repositories\\PostgresCompanySettingsRepository.cjs"
+  },
+  "checks": [
+    {
+      "name": "bridge source exists",
+      "status": "PASS",
+      "file": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01b-post-sales-delivery-wiring.mjs"
+    },
+    {
+      "name": "adapter source exists",
+      "status": "PASS",
+      "file": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-approved-surface-adapter.mjs"
+    },
+    {
+      "name": "company settings repository exists",
+      "status": "PASS",
+      "file": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\repositories\\PostgresCompanySettingsRepository.cjs"
+    },
+    {
+      "name": "SalesInvoiceService constructor receives companySettingsRepository",
+      "status": "PASS",
+      "grep": "new SalesInvoiceService({ salesInvoiceRepository, companySettingsRepository, transactionManager })"
+    },
+    {
+      "name": "DeliveryNoteService constructor receives companySettingsRepository when constructed",
+      "status": "PASS",
+      "grep": "new DeliveryNoteService({ deliveryNoteRepository, companySettingsRepository, transactionManager })"
+    },
+    {
+      "name": "SalesPostingService constructor receives companySettingsRepository",
+      "status": "PASS",
+      "grep": "new SalesPostingService({ ..., companySettingsRepository, ... })"
+    },
+    {
+      "name": "repository reads scoped PostgreSQL company row",
+      "status": "PASS",
+      "grep": "WHERE ${quoteIdent(meta.companyColumn)} = $1"
+    },
+    {
+      "name": "no direct SQL inserts into protected tables in INT01A Sales/Delivery bridge",
+      "status": "PASS",
+      "protectedTables": [
+        "sales",
+        "delivery",
+        "journal",
+        "gl_",
+        "general_ledger",
+        "ar_ap",
+        "vat",
+        "inventory",
+        "stock"
+      ]
+    },
+    {
+      "name": "adapter module load",
+      "status": "PASS"
+    },
+    {
+      "name": "createInt01aAdapter()/adapter export exposes postSalesDelivery",
+      "status": "PASS"
+    },
+    {
+      "name": "non-Sales function preserved: postPurchaseGrni",
+      "status": "PASS"
+    },
+    {
+      "name": "non-Sales function preserved: settleArAp",
+      "status": "PASS"
+    },
+    {
+      "name": "non-Sales function preserved: postInventoryAdjustment",
+      "status": "PASS"
+    },
+    {
+      "name": "non-Sales function preserved: cancelDocument",
+      "status": "PASS"
+    },
+    {
+      "name": "bridge module load",
+      "status": "PASS"
+    },
+    {
+      "name": "runtime constructor probe exported",
+      "status": "FAIL",
+      "exportName": "__int01bVerifyCompanySettingsRuntimePath"
+    }
+  ],
+  "status": "FAIL"
+}

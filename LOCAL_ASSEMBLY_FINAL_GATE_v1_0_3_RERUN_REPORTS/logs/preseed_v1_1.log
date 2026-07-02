@@ -1,0 +1,121 @@
+\set ON_ERROR_STOP on
+\pset tuples_only on
+\pset format unaligned
+\pset fieldsep '\t'
+BEGIN;
+SET LOCAL lock_timeout = '10s';
+SET LOCAL statement_timeout = '60s';
+SET LOCAL search_path = pg_catalog, public;
+-- Create/select deterministic local integration company baseline.
+WITH pre_existing AS (
+    SELECT "id"::text AS id FROM "public"."companies" WHERE "code"::text = 'MD01LOCAL' ORDER BY "id"::text LIMIT 1
+), ins AS (
+    INSERT INTO "public"."companies" ("code", "name", "is_active", "created_at", "updated_at")
+    SELECT 'MD01LOCAL', 'MD01 Local Integration Co', true, now(), now()
+    WHERE NOT EXISTS (SELECT 1 FROM pre_existing)
+    ON CONFLICT DO NOTHING
+    RETURNING "id"::text AS id
+), post_existing AS (
+    SELECT "id"::text AS id FROM "public"."companies" WHERE "code"::text = 'MD01LOCAL' ORDER BY "id"::text LIMIT 1
+)
+SELECT COALESCE((SELECT id FROM pre_existing), (SELECT id FROM ins), (SELECT id FROM post_existing), '') AS company_id \gset
+SELECT CASE WHEN :'company_id' ~* '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' THEN 'ok' ELSE (1/0)::text END AS _verify_company_uuid \gset
+-- Create/select deterministic inventory account baseline.
+WITH pre_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = ANY(ARRAY['156','1561']::text[]) AND "company_id"::text = :'company_id' ORDER BY CASE WHEN "code"::text = '156' THEN 0 WHEN "code"::text = '1561' THEN 1 ELSE 999 END, "id"::text LIMIT 1
+), ins AS (
+    INSERT INTO "public"."accounts" ("company_id", "code", "name", "account_type", "account_subtype", "normal_balance", "is_active", "created_at", "updated_at", "currency")
+    SELECT :'company_id'::uuid, '156', 'MD01 Inventory Asset Account', 'ASSET', 'merchandise_inventory', 'DEBIT', true, now(), now(), 'VND'
+    WHERE NOT EXISTS (SELECT 1 FROM pre_existing)
+    ON CONFLICT DO NOTHING
+    RETURNING "id"::text AS id
+), post_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = '156' AND "company_id"::text = :'company_id' ORDER BY "id"::text LIMIT 1
+)
+SELECT COALESCE((SELECT id FROM pre_existing), (SELECT id FROM ins), (SELECT id FROM post_existing), '') AS inventory_account_id \gset
+SELECT CASE WHEN :'inventory_account_id' ~* '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' THEN 'ok' ELSE (1/0)::text END AS _verify_inventory_uuid \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'inventory_account_id' AND lower(replace("account_type"::text, '-', '_')) = ANY(ARRAY['asset','assets','inventory','current_asset','current asset']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_inventory_type \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'inventory_account_id' AND "account_subtype" IS NOT NULL AND lower(replace("account_subtype"::text, '-', '_')) = ANY(ARRAY['merchandise_inventory','inventory','stock','stock_inventory','merchandise_inventory']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_inventory_subtype \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'inventory_account_id' AND lower(replace("normal_balance"::text, '-', '_')) = ANY(ARRAY['debit','dr','d']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_inventory_balance \gset
+-- Create/select deterministic cogs account baseline.
+WITH pre_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = ANY(ARRAY['632']::text[]) AND "company_id"::text = :'company_id' ORDER BY CASE WHEN "code"::text = '632' THEN 0 ELSE 999 END, "id"::text LIMIT 1
+), ins AS (
+    INSERT INTO "public"."accounts" ("company_id", "code", "name", "account_type", "account_subtype", "normal_balance", "is_active", "created_at", "updated_at", "currency")
+    SELECT :'company_id'::uuid, '632', 'MD01 Cost of Goods Sold Account', 'EXPENSE', 'cogs', 'DEBIT', true, now(), now(), 'VND'
+    WHERE NOT EXISTS (SELECT 1 FROM pre_existing)
+    ON CONFLICT DO NOTHING
+    RETURNING "id"::text AS id
+), post_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = '632' AND "company_id"::text = :'company_id' ORDER BY "id"::text LIMIT 1
+)
+SELECT COALESCE((SELECT id FROM pre_existing), (SELECT id FROM ins), (SELECT id FROM post_existing), '') AS cogs_account_id \gset
+SELECT CASE WHEN :'cogs_account_id' ~* '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' THEN 'ok' ELSE (1/0)::text END AS _verify_cogs_uuid \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'cogs_account_id' AND lower(replace("account_type"::text, '-', '_')) = ANY(ARRAY['expense','expenses','cogs','cost_of_goods_sold','cost of goods sold','cost']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_cogs_type \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'cogs_account_id' AND "account_subtype" IS NOT NULL AND lower(replace("account_subtype"::text, '-', '_')) = ANY(ARRAY['cogs','cost_of_goods_sold','cost of goods sold','cost','cogs']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_cogs_subtype \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'cogs_account_id' AND lower(replace("normal_balance"::text, '-', '_')) = ANY(ARRAY['debit','dr','d']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_cogs_balance \gset
+-- Create/select deterministic revenue account baseline.
+WITH pre_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = ANY(ARRAY['511','5111']::text[]) AND "company_id"::text = :'company_id' ORDER BY CASE WHEN "code"::text = '511' THEN 0 WHEN "code"::text = '5111' THEN 1 ELSE 999 END, "id"::text LIMIT 1
+), ins AS (
+    INSERT INTO "public"."accounts" ("company_id", "code", "name", "account_type", "account_subtype", "normal_balance", "is_active", "created_at", "updated_at", "currency")
+    SELECT :'company_id'::uuid, '511', 'MD01 Sales Revenue Account', 'REVENUE', 'sales_revenue', 'CREDIT', true, now(), now(), 'VND'
+    WHERE NOT EXISTS (SELECT 1 FROM pre_existing)
+    ON CONFLICT DO NOTHING
+    RETURNING "id"::text AS id
+), post_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = '511' AND "company_id"::text = :'company_id' ORDER BY "id"::text LIMIT 1
+)
+SELECT COALESCE((SELECT id FROM pre_existing), (SELECT id FROM ins), (SELECT id FROM post_existing), '') AS revenue_account_id \gset
+SELECT CASE WHEN :'revenue_account_id' ~* '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' THEN 'ok' ELSE (1/0)::text END AS _verify_revenue_uuid \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'revenue_account_id' AND lower(replace("account_type"::text, '-', '_')) = ANY(ARRAY['revenue','revenues','income','sales','sale']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_revenue_type \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'revenue_account_id' AND "account_subtype" IS NOT NULL AND lower(replace("account_subtype"::text, '-', '_')) = ANY(ARRAY['sales_revenue','sales','sale','revenue','income','sales_revenue']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_revenue_subtype \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'revenue_account_id' AND lower(replace("normal_balance"::text, '-', '_')) = ANY(ARRAY['credit','cr','c']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_revenue_balance \gset
+-- Create/select deterministic expense account baseline.
+WITH pre_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = ANY(ARRAY['642','6421']::text[]) AND "company_id"::text = :'company_id' ORDER BY CASE WHEN "code"::text = '642' THEN 0 WHEN "code"::text = '6421' THEN 1 ELSE 999 END, "id"::text LIMIT 1
+), ins AS (
+    INSERT INTO "public"."accounts" ("company_id", "code", "name", "account_type", "account_subtype", "normal_balance", "is_active", "created_at", "updated_at", "currency")
+    SELECT :'company_id'::uuid, '642', 'MD01 Purchase Expense Fallback Account', 'EXPENSE', 'purchase_expense', 'DEBIT', true, now(), now(), 'VND'
+    WHERE NOT EXISTS (SELECT 1 FROM pre_existing)
+    ON CONFLICT DO NOTHING
+    RETURNING "id"::text AS id
+), post_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = '642' AND "company_id"::text = :'company_id' ORDER BY "id"::text LIMIT 1
+)
+SELECT COALESCE((SELECT id FROM pre_existing), (SELECT id FROM ins), (SELECT id FROM post_existing), '') AS expense_account_id \gset
+SELECT CASE WHEN :'expense_account_id' ~* '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' THEN 'ok' ELSE (1/0)::text END AS _verify_expense_uuid \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'expense_account_id' AND lower(replace("account_type"::text, '-', '_')) = ANY(ARRAY['expense','expenses','purchase','operating_expense','operating expense']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_expense_type \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'expense_account_id' AND "account_subtype" IS NOT NULL AND lower(replace("account_subtype"::text, '-', '_')) = ANY(ARRAY['purchase_expense','purchase','purchases','operating_expense','expense','purchase_expense']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_expense_subtype \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'expense_account_id' AND lower(replace("normal_balance"::text, '-', '_')) = ANY(ARRAY['debit','dr','d']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_expense_balance \gset
+-- Create/select deterministic grni account baseline.
+WITH pre_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = ANY(ARRAY['3318','GRNI']::text[]) AND "company_id"::text = :'company_id' ORDER BY CASE WHEN "code"::text = '3318' THEN 0 WHEN "code"::text = 'GRNI' THEN 1 ELSE 999 END, "id"::text LIMIT 1
+), ins AS (
+    INSERT INTO "public"."accounts" ("company_id", "code", "name", "account_type", "account_subtype", "normal_balance", "is_active", "created_at", "updated_at", "currency")
+    SELECT :'company_id'::uuid, '3318', 'MD01 Goods Received Not Invoiced Account', 'LIABILITY', 'goods_received_not_invoiced', 'CREDIT', true, now(), now(), 'VND'
+    WHERE NOT EXISTS (SELECT 1 FROM pre_existing)
+    ON CONFLICT DO NOTHING
+    RETURNING "id"::text AS id
+), post_existing AS (
+    SELECT "id"::text AS id FROM "public"."accounts" WHERE "code"::text = '3318' AND "company_id"::text = :'company_id' ORDER BY "id"::text LIMIT 1
+)
+SELECT COALESCE((SELECT id FROM pre_existing), (SELECT id FROM ins), (SELECT id FROM post_existing), '') AS grni_account_id \gset
+SELECT CASE WHEN :'grni_account_id' ~* '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$' THEN 'ok' ELSE (1/0)::text END AS _verify_grni_uuid \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'grni_account_id' AND lower(replace("account_type"::text, '-', '_')) = ANY(ARRAY['liability','liabilities','current_liability','payable','payables']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_grni_type \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'grni_account_id' AND "account_subtype" IS NOT NULL AND lower(replace("account_subtype"::text, '-', '_')) = ANY(ARRAY['goods_received_not_invoiced','grni','goods received not invoiced','goods-received-not-invoiced','goods_received_not_invoiced']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_grni_subtype \gset
+SELECT CASE WHEN EXISTS (SELECT 1 FROM "public"."accounts" WHERE "id"::text = :'grni_account_id' AND lower(replace("normal_balance"::text, '-', '_')) = ANY(ARRAY['credit','cr','c']::text[])) THEN 'ok' ELSE (1/0)::text END AS _verify_grni_balance \gset
+-- Required account IDs must be distinct.
+SELECT CASE WHEN (SELECT count(DISTINCT x) FROM (VALUES (:'inventory_account_id'), (:'cogs_account_id'), (:'revenue_account_id'), (:'expense_account_id'), (:'grni_account_id')) AS v(x)) = 5 THEN 'ok' ELSE (1/0)::text END AS _verify_distinct_accounts \gset
+COMMIT;
+SELECT env_line FROM (VALUES
+  (1, 'MD01_COMPANY_ID=' || :'company_id'),
+  (2, 'MD01_INVENTORY_ACCOUNT_ID=' || :'inventory_account_id'),
+  (3, 'MD01_COGS_ACCOUNT_ID=' || :'cogs_account_id'),
+  (4, 'MD01_REVENUE_ACCOUNT_ID=' || :'revenue_account_id'),
+  (5, 'MD01_EXPENSE_ACCOUNT_ID=' || :'expense_account_id'),
+  (6, 'MD01_GRNI_ACCOUNT_ID=' || :'grni_account_id')
+) AS env(ordering, env_line) ORDER BY ordering;
+
+BLOCKED: psql failed with exit code 3:
+ERROR:  division by zero

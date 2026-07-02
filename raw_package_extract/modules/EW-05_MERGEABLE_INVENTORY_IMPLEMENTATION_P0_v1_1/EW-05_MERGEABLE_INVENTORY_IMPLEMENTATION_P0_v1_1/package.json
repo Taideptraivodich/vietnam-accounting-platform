@@ -1,0 +1,14 @@
+{
+  "name": "ew-05-mergeable-inventory-implementation-p0-v1-1",
+  "version": "1.1.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "EW-05 Freeze Scope v1.0 mergeable Inventory implementation package, contract-aligned to EW-01 UUID and Accounting Engine v1.1 requirements.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "verify": "node tests/verify_package.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

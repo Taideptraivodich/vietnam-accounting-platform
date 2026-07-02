@@ -1,0 +1,46 @@
+{
+  "package": "MD-01_MASTER_DATA_BASELINE_P0_v1_0",
+  "scope": "P0 smoke-test baseline only",
+  "records": {
+    "customers": [
+      {
+        "id": "00000000-0000-4000-8000-000000000101",
+        "code": "CUST-SMOKE-001",
+        "name": "Smoke Test Customer",
+        "is_active": true
+      }
+    ],
+    "suppliers": [
+      {
+        "id": "00000000-0000-4000-8000-000000000201",
+        "code": "SUP-SMOKE-001",
+        "name": "Smoke Test Supplier",
+        "is_active": true
+      }
+    ],
+    "warehouses": [
+      {
+        "id": "00000000-0000-4000-8000-000000000301",
+        "code": "WH-SMOKE-001",
+        "name": "Smoke Test Warehouse",
+        "is_active": true
+      }
+    ],
+    "items": [
+      {
+        "id": "00000000-0000-4000-8000-000000000401",
+        "code": "ITEM-STOCK-SMOKE-001",
+        "name": "Smoke Test Stock Item",
+        "item_type": "stock",
+        "is_stock_item": true,
+        "account_refs": {
+          "inventory_account_id": "MD01_INVENTORY_ACCOUNT_ID",
+          "cogs_account_id": "MD01_COGS_ACCOUNT_ID",
+          "revenue_account_id": "MD01_REVENUE_ACCOUNT_ID",
+          "expense_account_id": "MD01_EXPENSE_ACCOUNT_ID"
+        },
+        "is_active": true
+      }
+    ]
+  }
+}

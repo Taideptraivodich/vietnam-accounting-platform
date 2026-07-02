@@ -1,0 +1,5 @@
+ current_database | current_user | current_schema 
+------------------+--------------+----------------
+ vap_integration  | vap_user     | public
+(1 row)
+

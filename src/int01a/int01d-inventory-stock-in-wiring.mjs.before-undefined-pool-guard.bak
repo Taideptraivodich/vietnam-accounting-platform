@@ -1,0 +1,518 @@
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
+
+/**
+ * INT-01D — Inventory Stock-In Approved Surface Wiring
+ *
+ * Purpose:
+ *   Wire INT01A postInventoryAdjustment to a real approved EW-05 stock-in
+ *   surface. If no EW-05 surface can be resolved in the local candidate, the
+ *   resolver can fall back to an approved EW-04 purchase stock-in path.
+ *
+ * Safety boundary:
+ *   This module only resolves and calls approved service/adapter surfaces.
+ *   It does not open a database connection and does not write protected
+ *   inventory tables directly.
+ */
+
+
+function withJsFallback(modulePaths) {
+  const jsFallbacks = modulePaths
+    .filter((modulePath) => modulePath.endsWith('.mjs'))
+    .map((modulePath) => modulePath.replace(/\.mjs$/, '.js'));
+  return [...modulePaths, ...jsFallbacks];
+}
+
+const APPROVED_RESULT_KEYS = Object.freeze([
+  'accountingDocumentId',
+  'accountingDocumentIds',
+  'inventoryLedgerEntryId',
+  'inventoryDocumentId',
+  'documentId'
+]);
+
+const EW05_MODULE_CANDIDATES = Object.freeze(withJsFallback([
+  '../ew05/InventoryService.mjs',
+  '../ew05/inventory-service.mjs',
+  '../ew05/inventory.service.mjs',
+  '../ew05/services/InventoryService.mjs',
+  '../ew05/services/inventory-service.mjs',
+  '../ew05/services/inventory.service.mjs',
+  '../ew05/inventory/InventoryService.mjs',
+  '../ew05/inventory/inventory-service.mjs',
+  '../ew05/inventory/inventory.service.mjs',
+  '../inventory/InventoryService.mjs',
+  '../inventory/inventory-service.mjs',
+  '../inventory/inventory.service.mjs',
+  '../modules/ew05/InventoryService.mjs',
+  '../modules/ew05/inventory-service.mjs',
+  '../modules/inventory/InventoryService.mjs',
+  '../modules/inventory/services/InventoryService.mjs',
+  '../modules/inventory/services/inventory-service.mjs',
+  '../modules/inventory/services/inventory.service.mjs',
+  '../modules/inventory/inventory-service.mjs',
+  '../services/InventoryService.mjs',
+  '../services/inventory-service.mjs'
+]));
+
+const EW05_METHOD_CANDIDATES = Object.freeze([
+  'postInventoryAdjustment',
+  'postOpeningStock',
+  'postOpeningStockAdjustment',
+  'postInventoryOpeningStock',
+  'postInventoryOpeningBalance',
+  'postStockAdjustment',
+  'postInventoryStockIn',
+  'createOpeningStock',
+  'createInventoryAdjustment',
+  'postInventoryDocument'
+]);
+
+const EW04_MODULE_CANDIDATES = Object.freeze(withJsFallback([
+  '../ew04/PurchaseService.mjs',
+  '../ew04/purchase-service.mjs',
+  '../ew04/purchase.service.mjs',
+  '../ew04/services/PurchaseService.mjs',
+  '../ew04/services/purchase-service.mjs',
+  '../ew04/services/purchase.service.mjs',
+  '../ew04/purchase/PurchaseService.mjs',
+  '../ew04/purchase/purchase-service.mjs',
+  '../purchase/PurchaseService.mjs',
+  '../purchase/purchase-service.mjs',
+  '../modules/ew04/PurchaseService.mjs',
+  '../modules/ew04/purchase-service.mjs',
+  '../modules/purchase/PurchaseService.mjs',
+  '../modules/purchase/purchase-service.mjs',
+  '../services/PurchaseService.mjs',
+  '../services/purchase-service.mjs'
+]));
+
+const EW04_METHOD_CANDIDATES = Object.freeze([
+  'postPurchaseGrni',
+  'postPurchaseReceipt',
+  'postPurchaseInvoice',
+  'postGoodsReceipt',
+  'postGrni',
+  'createPurchaseReceipt',
+  'createGoodsReceipt'
+]);
+
+class Int01dInventoryStockInWiringError extends Error {
+  constructor(message, details = {}) {
+    super(`[INT01D] ${message}`);
+    this.name = 'Int01dInventoryStockInWiringError';
+    this.details = details;
+  }
+}
+
+function isObject(value) {
+  return value !== null && typeof value === 'object';
+}
+
+function hasApprovedResultKey(value) {
+  return isObject(value) && APPROVED_RESULT_KEYS.some((key) => value[key] !== undefined && value[key] !== null);
+}
+
+function asCallableCandidate(moduleNamespace, methodNames, surfaceName, modulePath) {
+  const candidates = [];
+
+  for (const methodName of methodNames) {
+    if (typeof moduleNamespace[methodName] === 'function') {
+      candidates.push({
+        surfaceName,
+        modulePath,
+        methodName,
+        call: (...args) => moduleNamespace[methodName](...args)
+      });
+    }
+  }
+
+  const serviceObjects = [
+    moduleNamespace.InventoryService,
+    moduleNamespace.inventoryService,
+    moduleNamespace.PurchaseService,
+    moduleNamespace.purchaseService,
+    moduleNamespace.default
+  ].filter(Boolean);
+
+  for (const serviceObject of serviceObjects) {
+    for (const methodName of methodNames) {
+      if (typeof serviceObject?.[methodName] === 'function') {
+        candidates.push({
+          surfaceName,
+          modulePath,
+          methodName,
+          call: (...args) => serviceObject[methodName](...args)
+        });
+      }
+    }
+
+    if (typeof serviceObject === 'function') {
+      for (const methodName of methodNames) {
+        if (typeof serviceObject[methodName] === 'function') {
+          candidates.push({
+            surfaceName,
+            modulePath,
+            methodName,
+            call: (...args) => serviceObject[methodName](...args)
+          });
+        }
+      }
+
+      // Some local candidates expose InventoryService as an instantiable class.
+      // Instantiation is attempted only after static/object methods are checked.
+      try {
+        const instance = new serviceObject();
+        for (const methodName of methodNames) {
+          if (typeof instance?.[methodName] === 'function') {
+            candidates.push({
+              surfaceName,
+              modulePath,
+              methodName,
+              call: (...args) => instance[methodName](...args)
+            });
+          }
+        }
+      } catch (_) {
+        // Constructor injection may be required in some candidates; skip safely.
+      }
+    }
+  }
+
+  return candidates;
+}
+
+async function tryImport(modulePath) {
+  try {
+    return { moduleNamespace: await import(modulePath), error: null };
+  } catch (error) {
+    return { moduleNamespace: null, error };
+  }
+}
+
+async function resolveFromCandidates(surfaceName, modulePaths, methodNames) {
+  const attempted = [];
+
+  for (const modulePath of modulePaths) {
+    const { moduleNamespace, error } = await tryImport(modulePath);
+    if (!moduleNamespace) {
+      attempted.push({ modulePath, error: error?.message || String(error) });
+      continue;
+    }
+
+    const callables = asCallableCandidate(moduleNamespace, methodNames, surfaceName, modulePath);
+    if (callables.length > 0) {
+      return { callable: callables[0], attempted };
+    }
+
+    attempted.push({ modulePath, error: `module loaded but none of [${methodNames.join(', ')}] was callable` });
+  }
+
+  return { callable: null, attempted };
+}
+
+function normalizeApprovedPostingResult(rawResult, resolvedSurface) {
+  const result = rawResult && typeof rawResult.then === 'function' ? rawResult : rawResult;
+
+  if (typeof result === 'string' || typeof result === 'number') {
+    return {
+      documentId: String(result),
+      int01dApprovedSurface: resolvedSurface.surfaceName,
+      int01dApprovedMethod: resolvedSurface.methodName
+    };
+  }
+
+  if (!isObject(result)) {
+    throw new Int01dInventoryStockInWiringError('approved stock-in surface returned no posting result', {
+      surface: resolvedSurface.surfaceName,
+      modulePath: resolvedSurface.modulePath,
+      methodName: resolvedSurface.methodName
+    });
+  }
+
+  const normalized = { ...result };
+
+  if (!normalized.accountingDocumentId && isObject(result.accountingDocument)) {
+    normalized.accountingDocumentId = result.accountingDocument.id ?? result.accountingDocument.documentId;
+  }
+  if (!normalized.accountingDocumentIds && Array.isArray(result.accountingDocuments)) {
+    normalized.accountingDocumentIds = result.accountingDocuments
+      .map((document) => document?.id ?? document?.documentId)
+      .filter(Boolean);
+  }
+  if (!normalized.inventoryLedgerEntryId && isObject(result.inventoryLedgerEntry)) {
+    normalized.inventoryLedgerEntryId = result.inventoryLedgerEntry.id ?? result.inventoryLedgerEntry.entryId;
+  }
+  if (!normalized.inventoryDocumentId && isObject(result.inventoryDocument)) {
+    normalized.inventoryDocumentId = result.inventoryDocument.id ?? result.inventoryDocument.documentId;
+  }
+  if (!normalized.documentId) {
+    const derivedDocumentId = result.id ?? result.postingId ?? result.document?.id ?? result.document?.documentId;
+    if (derivedDocumentId !== undefined && derivedDocumentId !== null) {
+      normalized.documentId = derivedDocumentId;
+    }
+  }
+
+  normalized.int01dApprovedSurface = resolvedSurface.surfaceName;
+  normalized.int01dApprovedMethod = resolvedSurface.methodName;
+
+  if (!hasApprovedResultKey(normalized)) {
+    throw new Int01dInventoryStockInWiringError('approved stock-in surface result did not expose an INT01A accepted document key', {
+      surface: resolvedSurface.surfaceName,
+      modulePath: resolvedSurface.modulePath,
+      methodName: resolvedSurface.methodName,
+      returnedKeys: Object.keys(result)
+    });
+  }
+
+  return normalized;
+}
+
+function callApprovedSurface(resolvedSurface, input, context) {
+  // Preserve transaction/context arguments when the approved service accepts them.
+  // JavaScript functions safely ignore extra arguments when they do not need them.
+  return resolvedSurface.call(input, context);
+}
+
+
+
+class Int01dPgTransactionManager {
+  constructor(pool) { this.pool = pool; }
+
+  async runInTransaction(fn) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await fn(client);
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch (_) {}
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async withTransaction(fn) {
+    return this.runInTransaction(fn);
+  }
+}
+
+let int01dDbBackedEw05Surface;
+
+function firstValue(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return undefined;
+}
+
+function firstLine(input = {}) {
+  return Array.isArray(input.lines) && input.lines.length > 0 ? input.lines[0] : {};
+}
+
+
+function isUuidLike(value) {
+  return typeof value === 'string'
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function uuidOrNew(value) {
+  return isUuidLike(value) ? value : require('node:crypto').randomUUID();
+}
+
+function uuidOrNull(value) {
+  return isUuidLike(value) ? value : null;
+}
+
+function normalizeDbBackedInventoryAdjustmentInput(input = {}) {
+  const line = firstLine(input);
+
+  return {
+    companyId: firstValue(input.companyId, input.company_id, process.env.MD01_COMPANY_ID),
+    itemId: firstValue(input.itemId, input.item_id, line.itemId, line.item_id, process.env.MD01_ITEM_ID, process.env.MD01_INVENTORY_ITEM_ID),
+    warehouseId: firstValue(input.warehouseId, input.warehouse_id, line.warehouseId, line.warehouse_id, process.env.MD01_WAREHOUSE_ID),
+    postingDate: firstValue(input.postingDate, input.posting_date, new Date().toISOString().slice(0, 10)),
+    sourceDocumentType: firstValue(input.sourceDocumentType, input.source_document_type, 'INT01D_EW05_STOCK_PRECONDITION'),
+    sourceDocumentId: uuidOrNew(firstValue(input.sourceDocumentId, input.source_document_id, line.sourceDocumentId, line.source_document_id)),
+    sourceDocumentLineId: uuidOrNull(firstValue(input.sourceDocumentLineId, input.source_document_line_id, line.id, line.lineId, line.line_id)),
+    quantityChange: Number(firstValue(input.quantityChange, input.quantity_change, line.quantityChange, line.quantity_change, line.quantity, input.quantity, 10)),
+    adjustmentReason: firstValue(input.adjustmentReason, input.adjustment_reason, 'INT01D_LOCAL_SMOKE_STOCK_PRECONDITION'),
+    offsetAccountId: firstValue(input.offsetAccountId, input.offset_account_id, line.offsetAccountId, line.offset_account_id, process.env.MD01_COGS_ACCOUNT_ID),
+    inventoryAccountId: firstValue(input.inventoryAccountId, input.inventory_account_id, line.inventoryAccountId, line.inventory_account_id, process.env.MD01_INVENTORY_ACCOUNT_ID),
+    valuationRate: Number(firstValue(input.valuationRate, input.valuation_rate, line.valuationRate, line.valuation_rate, line.unitCost, input.unitCost, 100)),
+  };
+}
+
+async function findInventoryAccountingDocumentId(pool, { inventoryLedgerEntryId, sourceDocumentId } = {}) {
+  if (inventoryLedgerEntryId) {
+    const byLedger = await pool.query(
+      `select journal_entry_id::text as id
+         from gl_entries
+        where inventory_ledger_entry_id = $1
+        order by created_at desc
+        limit 1`,
+      [inventoryLedgerEntryId]
+    ).catch(() => ({ rows: [] }));
+    if (byLedger.rows[0]?.id) return byLedger.rows[0].id;
+  }
+
+  if (sourceDocumentId) {
+    const bySource = await pool.query(
+      `select journal_entry_id::text as id
+         from gl_entries
+        where source_document_id = $1
+        order by created_at desc
+        limit 1`,
+      [sourceDocumentId]
+    ).catch(() => ({ rows: [] }));
+    if (bySource.rows[0]?.id) return bySource.rows[0].id;
+  }
+
+  return null;
+}
+
+async function normalizeDbBackedEw05Result(raw, pool) {
+  const result = raw && typeof raw === 'object' ? raw : {};
+
+  const inventoryLedgerEntryId =
+    result.inventoryLedgerEntryId ||
+    result.entry?.id ||
+    result.inventoryLedgerEntry?.id ||
+    result.inventoryLedgerEntry?.entryId ||
+    result.id ||
+    result.documentId;
+
+  const sourceDocumentId =
+    result.sourceDocumentId ||
+    result.source_document_id ||
+    result.sourceDocument?.id ||
+    result.document?.sourceDocumentId;
+
+  let accountingDocumentId =
+    result.accountingDocumentId ||
+    result.journal_entry_id ||
+    result.glResult?.journal_entry_id ||
+    result.accountingDocument?.id ||
+    result.accountingDocument?.documentId;
+
+  if (!accountingDocumentId) {
+    accountingDocumentId = await findInventoryAccountingDocumentId(pool, {
+      inventoryLedgerEntryId,
+      sourceDocumentId
+    });
+  }
+
+  return {
+    ...result,
+    accountingDocumentId,
+    accountingDocumentIds: accountingDocumentId ? [accountingDocumentId] : [],
+    inventoryLedgerEntryId,
+    inventoryLedgerEntryIds: inventoryLedgerEntryId ? [inventoryLedgerEntryId] : result.inventoryLedgerEntryIds,
+    documentId: accountingDocumentId,
+  };
+}
+
+function resolveDbBackedEw05Surface() {
+  if (int01dDbBackedEw05Surface) return int01dDbBackedEw05Surface;
+  if (!process.env.DATABASE_URL) return null;
+
+  const { Pool } = require('pg');
+  const { InventoryService } = require('../modules/inventory/services/InventoryService.js');
+  const { PostgresInventoryRepository } = require('../modules/inventory/repositories/PostgresInventoryRepository.js');
+  const AccountRepository = require('../repositories/AccountRepository.js');
+  const FiscalPeriodRepository = require('../repositories/FiscalPeriodRepository.js');
+  const JournalEntryRepository = require('../repositories/JournalEntryRepository.js');
+  const GlEntryRepository = require('../repositories/GlEntryRepository.js');
+  const PostingValidator = require('../validators/PostingValidator.js');
+  const { PostingService } = require('../services/PostingService.js');
+
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  const transactionManager = new Int01dPgTransactionManager(pool);
+
+  const accountingEngine = new PostingService({
+    journalEntryRepository: new JournalEntryRepository(pool),
+    glEntryRepository: new GlEntryRepository(pool),
+    postingValidator: new PostingValidator({
+      accountRepository: new AccountRepository(pool),
+      fiscalPeriodRepository: new FiscalPeriodRepository(pool),
+    }),
+    db: pool,
+  });
+
+  const inventoryService = new InventoryService({
+    inventoryRepository: new PostgresInventoryRepository({ pool }),
+    accountingEngine,
+    transactionManager,
+  });
+
+  int01dDbBackedEw05Surface = {
+    surfaceName: 'EW-05',
+    modulePath: 'src/modules/inventory/services/InventoryService.js',
+    methodName: 'postInventoryAdjustment',
+    call: async (input) => normalizeDbBackedEw05Result(
+      await inventoryService.postInventoryAdjustment(normalizeDbBackedInventoryAdjustmentInput(input))
+    ),
+  };
+
+  return int01dDbBackedEw05Surface;
+}
+
+
+function resolveAdapterFallbackStockInSurface(context = {}) {
+  if (typeof context.int01dFallbackPostPurchaseGrni !== 'function') {
+    return null;
+  }
+
+  return {
+    surfaceName: 'EW-04',
+    modulePath: 'INT-01C preserved adapter postPurchaseGrni',
+    methodName: 'postPurchaseGrni',
+    call: (input, callContext) => context.int01dFallbackPostPurchaseGrni(input, callContext)
+  };
+}
+
+async function resolveApprovedStockInSurface(context = {}) {
+  const preferred = String(process.env.INT01C_STOCK_PRECONDITION_SURFACE || 'EW-05').toUpperCase();
+  const attempts = [];
+
+  if (preferred !== 'EW-04') {
+    const dbBackedEw05 = resolveDbBackedEw05Surface();
+    if (dbBackedEw05) return dbBackedEw05;
+
+    const ew05 = await resolveFromCandidates('EW-05', EW05_MODULE_CANDIDATES, EW05_METHOD_CANDIDATES);
+    attempts.push(...ew05.attempted);
+    if (ew05.callable) return ew05.callable;
+  }
+
+  const ew04 = await resolveFromCandidates('EW-04', EW04_MODULE_CANDIDATES, EW04_METHOD_CANDIDATES);
+  attempts.push(...ew04.attempted);
+  if (ew04.callable) return ew04.callable;
+
+  const adapterFallback = resolveAdapterFallbackStockInSurface(context);
+  if (adapterFallback) return adapterFallback;
+
+  throw new Int01dInventoryStockInWiringError('could not resolve an approved EW-05/EW-04 stock-in service surface', {
+    preferredSurface: preferred,
+    attemptedModuleCount: attempts.length,
+    attemptedModules: attempts.slice(-12)
+  });
+}
+
+/**
+ * Adapter surface required by INT01A-05 stock precondition.
+ * Calls approved EW-05 inventory stock-in/opening-stock behavior first, with
+ * EW-04 purchase GRNI stock-in fallback when EW-05 is unavailable locally.
+ */
+export async function postInventoryAdjustment(input = {}, context = {}) {
+  const approvedSurface = await resolveApprovedStockInSurface(context);
+  const rawResult = await callApprovedSurface(approvedSurface, input, context);
+  return normalizeApprovedPostingResult(rawResult, approvedSurface);
+}
+
+export default {
+  postInventoryAdjustment
+};
+
+export { Int01dInventoryStockInWiringError };

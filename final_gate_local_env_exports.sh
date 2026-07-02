@@ -1,0 +1,113 @@
+#!/usr/bin/env bash
+# LOCAL_RUNBOOK v1.0.5 environment propagation helper.
+# Source this file from run_int01b_final_gate_local.sh; it intentionally contains
+# no accounting/business logic and only handles local integration gate env export.
+
+set -Eeuo pipefail
+
+local_gate_quote() {
+  # Print a shell-safe single-quoted value.
+  # Usage: local_gate_quote "$value"
+  local value=${1-}
+  printf "'%s'" "${value//\'/\'\\\'\'}"
+}
+
+local_gate_source_generated_env() {
+  local generated_env=${1:?generated env file path required}
+
+  if [[ ! -f "$generated_env" ]]; then
+    echo "ERROR: generated env file not found: $generated_env" >&2
+    return 1
+  fi
+
+  # The preseed output is expected to be a dotenv-compatible shell assignment file.
+  # set -a ensures every assignment becomes exported for npm child processes.
+  set -a
+  # shellcheck disable=SC1090
+  source "$generated_env"
+  set +a
+}
+
+local_gate_export_required_env() {
+  local database_url=${1:?DATABASE_URL required}
+
+  export DATABASE_URL="$database_url"
+  export NODE_ENV=integration
+
+  # INT01A approved local table/adapter wiring required by the final gate.
+  export INT01A_TABLE_AR_LEDGER=ar_ap_ledger_entries
+  export INT01A_TABLE_AP_LEDGER=ar_ap_ledger_entries
+  export INT01A_ADAPTER_MODULE="${INT01A_ADAPTER_MODULE:-./src/int01a/int01a-approved-surface-adapter.mjs}"
+
+  # INT-01C local smoke stock precondition requires MD01 item/warehouse IDs.
+  # Resolve them from MD01 seeded master data using SELECT only; no protected stock/inventory writes.
+  if [[ -n "${MD01_COMPANY_ID:-}" && -n "${DATABASE_URL:-}" ]]; then
+    if [[ -z "${MD01_ITEM_ID:-}" ]]; then
+      local local_gate_md01_item_id
+      local_gate_md01_item_id="$(psql -d "$DATABASE_URL" -Atqc "select id from items where company_id = '${MD01_COMPANY_ID}'::uuid and coalesce(is_active, true) = true order by code nulls last, id limit 1" 2>/dev/null || true)"
+      if [[ -n "$local_gate_md01_item_id" ]]; then
+        export MD01_ITEM_ID="$local_gate_md01_item_id"
+        export MD01_INVENTORY_ITEM_ID="${MD01_INVENTORY_ITEM_ID:-$local_gate_md01_item_id}"
+      fi
+    fi
+
+    if [[ -z "${MD01_WAREHOUSE_ID:-}" ]]; then
+      local local_gate_md01_warehouse_id
+      local_gate_md01_warehouse_id="$(psql -d "$DATABASE_URL" -Atqc "select id from warehouses where company_id = '${MD01_COMPANY_ID}'::uuid and coalesce(is_active, true) = true order by code nulls last, id limit 1" 2>/dev/null || true)"
+      if [[ -n "$local_gate_md01_warehouse_id" ]]; then
+        export MD01_WAREHOUSE_ID="$local_gate_md01_warehouse_id"
+      fi
+    fi
+  fi
+
+  local missing=()
+  local required_md01_vars=(
+    MD01_COMPANY_ID
+    MD01_INVENTORY_ACCOUNT_ID
+    MD01_COGS_ACCOUNT_ID
+    MD01_REVENUE_ACCOUNT_ID
+    MD01_EXPENSE_ACCOUNT_ID
+    MD01_GRNI_ACCOUNT_ID
+  )
+
+  local var_name
+  for var_name in "${required_md01_vars[@]}"; do
+    if [[ -z "${!var_name:-}" ]]; then
+      missing+=("$var_name")
+    else
+      export "$var_name"
+    fi
+  done
+
+  if (( ${#missing[@]} > 0 )); then
+    echo "ERROR: missing required MD01 environment variables after preseed:" >&2
+    printf '  - %s\n' "${missing[@]}" >&2
+    return 1
+  fi
+}
+
+local_gate_write_env_snapshot() {
+  local output_file=${1:?output file required}
+  mkdir -p "$(dirname "$output_file")"
+  : > "$output_file"
+
+  local vars=(
+    DATABASE_URL
+    NODE_ENV
+    MD01_COMPANY_ID
+    MD01_INVENTORY_ACCOUNT_ID
+    MD01_COGS_ACCOUNT_ID
+    MD01_REVENUE_ACCOUNT_ID
+    MD01_EXPENSE_ACCOUNT_ID
+    MD01_GRNI_ACCOUNT_ID
+    INT01A_TABLE_AR_LEDGER
+    INT01A_TABLE_AP_LEDGER
+    INT01A_ADAPTER_MODULE
+  )
+
+  local var_name value
+  for var_name in "${vars[@]}"; do
+    value=${!var_name:-}
+    printf 'export %s=%s\n' "$var_name" "$(local_gate_quote "$value")" >> "$output_file"
+  done
+}

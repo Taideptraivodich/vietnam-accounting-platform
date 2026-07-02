@@ -1,0 +1,112 @@
+# INT-01A Smoke Test Result
+
+- Runner: INT-01A_P0_v1.0
+- Run ID: int01a-2026-06-28T05-55-43-739Z-a77ee01f
+- Status: **FAIL**
+- Started: 2026-06-28T05:55:43.740Z
+- Ended: 2026-06-28T05:55:43.744Z
+- NODE_ENV: integration
+- DATABASE_URL: postgres://vap_user:***@127.0.0.1:15432/vap_integration
+
+## Step Summary
+
+| Step | Status | Duration ms | Title |
+|---|---:|---:|---|
+| INT01A-00 | PASS | 1 | Required environment is present and integration-only |
+| INT01A-01 | FAIL | 1 | Database connectivity uses real PostgreSQL |
+
+## Failures / Open Issues
+
+### INT01A-01 — Database connectivity uses real PostgreSQL
+
+- Error: Missing dependency: pg. Run npm install, or install pg in the candidate tree.
+
+```json
+{
+  "cause": "Cannot find package 'pg' imported from F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-smoke-runner.mjs",
+  "exitCode": 2
+}
+```
+
+## Full Evidence
+
+```json
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-06-28T05-55-43-739Z-a77ee01f",
+  "status": "FAIL",
+  "startedAt": "2026-06-28T05:55:43.740Z",
+  "endedAt": "2026-06-28T05:55:43.744Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "nodeEnv": "integration",
+    "databaseUrlRedacted": "postgres://vap_user:***@127.0.0.1:15432/vap_integration"
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "PASS",
+      "startedAt": "2026-06-28T05:55:43.741Z",
+      "endedAt": "2026-06-28T05:55:43.742Z",
+      "durationMs": 1,
+      "evidence": {
+        "requiredEnv": [
+          "DATABASE_URL",
+          "NODE_ENV",
+          "MD01_COMPANY_ID",
+          "MD01_INVENTORY_ACCOUNT_ID",
+          "MD01_COGS_ACCOUNT_ID",
+          "MD01_REVENUE_ACCOUNT_ID",
+          "MD01_EXPENSE_ACCOUNT_ID"
+        ],
+        "databaseUrlRedacted": "postgres://vap_user:***@127.0.0.1:15432/vap_integration"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-01",
+      "title": "Database connectivity uses real PostgreSQL",
+      "status": "FAIL",
+      "startedAt": "2026-06-28T05:55:43.742Z",
+      "endedAt": "2026-06-28T05:55:43.743Z",
+      "durationMs": 1,
+      "evidence": null,
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Missing dependency: pg. Run npm install, or install pg in the candidate tree.",
+        "details": {
+          "cause": "Cannot find package 'pg' imported from F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-smoke-runner.mjs",
+          "exitCode": 2
+        }
+      }
+    }
+  ],
+  "openIssues": [
+    {
+      "step": "INT01A-01",
+      "title": "Database connectivity uses real PostgreSQL",
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Missing dependency: pg. Run npm install, or install pg in the candidate tree.",
+        "details": {
+          "cause": "Cannot find package 'pg' imported from F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-smoke-runner.mjs",
+          "exitCode": 2
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "db": null,
+    "migrationInfo": null
+  },
+  "terminalError": {
+    "name": "SmokeFailure",
+    "message": "Missing dependency: pg. Run npm install, or install pg in the candidate tree.",
+    "details": {
+      "cause": "Cannot find package 'pg' imported from F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-smoke-runner.mjs",
+      "exitCode": 2
+    }
+  }
+}
+```

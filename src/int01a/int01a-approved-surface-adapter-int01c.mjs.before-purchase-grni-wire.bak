@@ -1,0 +1,72 @@
+/**
+ * INT-01D wrapper template.
+ *
+ * scripts/int01d-apply.sh writes this content to:
+ *   src/int01a/int01a-approved-surface-adapter-int01c.mjs
+ *
+ * The original INT-01C adapter is preserved beside it as:
+ *   src/int01a/int01a-approved-surface-adapter-int01c.pre-int01d.mjs
+ */
+import * as int01cAdapter from './int01a-approved-surface-adapter-int01c.pre-int01d.mjs';
+import * as baseApprovedAdapter from './int01a-approved-surface-adapter.mjs';
+import { ensureSalesStockPrecondition } from './int01a-sales-stock-precondition-bridge.mjs';
+import { postInventoryAdjustment as int01dPostInventoryAdjustment } from './int01d-inventory-stock-in-wiring.mjs';
+
+export * from './int01a-approved-surface-adapter-int01c.pre-int01d.mjs';
+
+function resolveUpstreamFunction(name) {
+  const fn = int01cAdapter[name] ?? int01cAdapter.default?.[name];
+  if (typeof fn !== 'function') {
+    const error = new Error(`[INT01D] Required upstream INT-01C adapter export is missing: ${name}`);
+    error.name = 'Int01dAdapterExportError';
+    error.details = { requiredExport: name };
+    throw error;
+  }
+  return fn;
+}
+
+export async function postSalesDelivery(...args) {
+  const input = args[0] ?? {};
+  await ensureSalesStockPrecondition({
+    ...baseApprovedAdapter,
+    postInventoryAdjustment,
+    postPurchaseGrni
+  }, input);
+  return baseApprovedAdapter.postSalesDelivery(input);
+}
+
+export async function postPurchaseGrni(...args) {
+  return resolveUpstreamFunction('postPurchaseGrni')(...args);
+}
+
+export async function settleArAp(...args) {
+  return resolveUpstreamFunction('settleArAp')(...args);
+}
+
+export async function cancelDocument(...args) {
+  return resolveUpstreamFunction('cancelDocument')(...args);
+}
+
+export async function postInventoryAdjustment(...args) {
+  const input = args[0] ?? {};
+  const contextArg = args[1] && typeof args[1] === 'object' ? args[1] : {};
+  const context = {
+    ...contextArg,
+    int01dFallbackPostPurchaseGrni: (...fallbackArgs) => resolveUpstreamFunction('postPurchaseGrni')(...fallbackArgs)
+  };
+
+  if (args.length > 2) {
+    context.int01dExtraArgs = args.slice(2);
+  }
+
+  return int01dPostInventoryAdjustment(input, context);
+}
+
+export default {
+  ...(int01cAdapter.default || {}),
+  postSalesDelivery,
+  postPurchaseGrni,
+  settleArAp,
+  postInventoryAdjustment,
+  cancelDocument
+};

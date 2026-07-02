@@ -1,0 +1,46 @@
+{
+  "name": "vietnam-accounting-platform-local-candidate-v1-0-3",
+  "version": "1.0.3-local-assembly",
+  "private": true,
+  "type": "commonjs",
+  "description": "Local candidate source tree assembled from accepted EW/MD/INT packages for Final Integration Gate v1.0.3 preparation.",
+  "scripts": {
+    "migrate:order": "cat migrations/MIGRATION_ORDER.txt",
+    "migrate:local": "bash scripts/apply_migrations_in_order.sh",
+    "seed:md01": "bash scripts/run_md01_seed.sh",
+    "int01:procedure": "node ./src/int01a/int01a-smoke-runner.mjs --procedure",
+    "test:ew01": "node tests/run_unit_tests.js",
+    "test:ew02": "jest --config jest.config.cjs --runInBand tests/ar-ap.service.test.ts tests/ar-ap.routes.test.ts",
+    "test:ew02:types": "tsc --noEmit",
+    "test:ew03": "node --test tests/salesPostingService.test.js",
+    "test:ew04": "node --test tests/purchase-account-resolver.service.test.js tests/purchase-invoice.service.test.js tests/validators.test.js",
+    "test:ew05": "node tests/verify_package.js && node --test tests/accounting_contract.test.js tests/inventory_service.test.js tests/migration_contract.test.js",
+    "test:ew06": "node --test test/*.test.js",
+    "int01a:smoke": "node ./src/int01a/int01a-smoke-runner.mjs",
+    "migrate:local:crlf-safe": "MIGRATION_ORDER_FILE=migrations/MIGRATION_ORDER.txt MIGRATION_ROOT=. bash scripts/apply_ordered_migrations_crlf_safe.sh",
+    "md01:seed": "bash scripts/run_md01_seed.sh"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "pg": "^8.16.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^20.14.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.8.3"
+  },
+  "localAssemblyNotes": [
+    "Root package.json is a thin local candidate manifest. It does not replace module package manifests retained under raw_package_extract/modules.",
+    "INT-01 artifact contains procedure/report docs only; no executable cross-module smoke runner was added.",
+    "No business rules, API contracts, or database schemas beyond package SQL files were changed.",
+    "INT-01A runner installed from P0 remediation package.",
+    "MD01/EW01 deterministic preseed upgraded to v1.1 account_subtype patch.",
+    "INT-01B approved surface adapter installed."
+  ]
+}

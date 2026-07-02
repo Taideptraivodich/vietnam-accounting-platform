@@ -1,0 +1,33 @@
+{
+  "package": "INT-01B_COMPANY_SETTINGS_RUNTIME_PATH_P0_v1_3",
+  "mode": "targeted-merge",
+  "repoRoot": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b",
+  "actions": [
+    {
+      "action": "copy",
+      "label": "PostgresCompanySettingsRepository",
+      "source": "F:\\vap\\rerun_after_int01b_v13_bundle\\_patches\\int01b\\INT-01B_COMPANY_SETTINGS_RUNTIME_PATH_P0_v1_3\\src\\int01a\\repositories\\PostgresCompanySettingsRepository.cjs",
+      "target": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\repositories\\PostgresCompanySettingsRepository.cjs",
+      "backupPath": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\repositories\\PostgresCompanySettingsRepository.cjs.pre-int01b-v13.bak"
+    },
+    {
+      "action": "copy",
+      "label": "runtime verification script",
+      "source": "F:\\vap\\rerun_after_int01b_v13_bundle\\_patches\\int01b\\INT-01B_COMPANY_SETTINGS_RUNTIME_PATH_P0_v1_3\\scripts\\int01b-verify-company-settings-runtime-path.mjs",
+      "target": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\scripts\\int01b-verify-company-settings-runtime-path.mjs",
+      "backupPath": null
+    },
+    {
+      "action": "patch",
+      "label": "Sales/Delivery runtime bridge dependency injection",
+      "target": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01b-post-sales-delivery-wiring.mjs",
+      "backupPath": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01b-post-sales-delivery-wiring.mjs.pre-int01b-v13.bak"
+    }
+  ],
+  "nextCommands": [
+    "node --check src/int01a/int01b-post-sales-delivery-wiring.mjs",
+    "node --check src/int01a/repositories/PostgresCompanySettingsRepository.cjs",
+    "node scripts/int01b-verify-company-settings-runtime-path.mjs",
+    "npm run int01a:smoke"
+  ]
+}

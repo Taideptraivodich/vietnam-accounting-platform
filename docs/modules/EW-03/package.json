@@ -1,0 +1,13 @@
+{
+  "name": "ew-03-sales-delivery-revision",
+  "version": "1.2.0",
+  "private": true,
+  "type": "commonjs",
+  "description": "EW-03 round 2 revision patch: Sales / Delivery baseline aligned to frozen account_subtype enum, EW-01 Core Accounting, accounts, inventory, AR/AP and VAT contracts.",
+  "scripts": {
+    "test": "node --test tests/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

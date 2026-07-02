@@ -1,0 +1,22 @@
+{
+  "package": "LOCAL_RUNBOOK_COMPAT_PATCH_P0_v1_0_5",
+  "zip_name": "LOCAL_RUNBOOK_COMPAT_PATCH_P0_v1_0_5.zip",
+  "scope": "local runbook compatibility only",
+  "production_merge": "NOT_ALLOWED",
+  "architecture_freeze": "STILL_VALID",
+  "p1_p2": "NOT_OPENED",
+  "files": [
+    "run_int01b_final_gate_local.sh",
+    "final_gate_local_env_exports.sh",
+    "README.md",
+    "WINDOWS_GIT_BASH_COMPATIBILITY_NOTES.md",
+    "CLEAN_RERUN_COMMAND.md",
+    "EVIDENCE_CHECKLIST.md",
+    "FIXED_BUGS.md",
+    "NO_PRODUCTION_MERGE_STATUS.md"
+  ],
+  "expected_current_blocker_until_int01b_v1_2": {
+    "step": "INT01A-05",
+    "error": "companySettingsRepository is required"
+  }
+}

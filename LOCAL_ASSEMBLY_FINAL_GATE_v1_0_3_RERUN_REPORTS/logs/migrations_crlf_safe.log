@@ -1,0 +1,203 @@
+Applying migration: migrations/001_EW-01_gl_foundation.sql
+CREATE EXTENSION
+CREATE TABLE
+CREATE TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:79: NOTICE:  column "account_subtype" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:80: NOTICE:  column "normal_balance" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:81: NOTICE:  column "requires_tax_info" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:82: NOTICE:  column "requires_inventory_item" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:83: NOTICE:  column "requires_warehouse" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:84: NOTICE:  column "requires_party" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:85: NOTICE:  column "default_party_type" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:86: NOTICE:  column "is_bipolar" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:87: NOTICE:  column "presentation_rule" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:88: NOTICE:  column "phase_scope" of relation "accounts" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:89: NOTICE:  column "accounting_regime" of relation "accounts" already exists, skipping
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:236: NOTICE:  column "inventory_item_id" of relation "journal_entry_lines" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:237: NOTICE:  column "inventory_item_id" of relation "gl_entries" already exists, skipping
+ALTER TABLE
+psql:migrations/001_EW-01_gl_foundation.sql:246: NOTICE:  rule "gl_entries_no_update" for relation "gl_entries" does not exist, skipping
+DROP RULE
+psql:migrations/001_EW-01_gl_foundation.sql:247: NOTICE:  rule "gl_entries_no_delete" for relation "gl_entries" does not exist, skipping
+DROP RULE
+CREATE FUNCTION
+psql:migrations/001_EW-01_gl_foundation.sql:262: NOTICE:  trigger "trg_gl_entries_no_update" for relation "gl_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:migrations/001_EW-01_gl_foundation.sql:267: NOTICE:  trigger "trg_gl_entries_no_delete" for relation "gl_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+psql:migrations/001_EW-01_gl_foundation.sql:282: NOTICE:  trigger "trg_posted_journal_entries_no_delete" for relation "journal_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+psql:migrations/001_EW-01_gl_foundation.sql:312: NOTICE:  trigger "trg_posted_journal_entry_lines_no_update" for relation "journal_entry_lines" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:migrations/001_EW-01_gl_foundation.sql:317: NOTICE:  trigger "trg_posted_journal_entry_lines_no_delete" for relation "journal_entry_lines" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+psql:migrations/001_EW-01_gl_foundation.sql:340: NOTICE:  trigger "trg_posted_journal_entries_guard_update" for relation "journal_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+Applying migration: migrations/002_EW-06_vat_ledger.sql
+BEGIN
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+psql:migrations/002_EW-06_vat_ledger.sql:77: NOTICE:  Role app_runtime_role does not exist yet; skipping GRANT/REVOKE. Apply manually once the runtime role is provisioned.
+DO
+CREATE FUNCTION
+psql:migrations/002_EW-06_vat_ledger.sql:86: NOTICE:  trigger "trg_tax_ledger_entries_block_update" for relation "tax_ledger_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:migrations/002_EW-06_vat_ledger.sql:91: NOTICE:  trigger "trg_tax_ledger_entries_block_delete" for relation "tax_ledger_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+COMMIT
+Applying migration: migrations/003_EW-02_ar_ap_ledger_allocations.sql
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TRIGGER
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+Applying migration: migrations/004_MD-01_master_data_schema.sql
+BEGIN
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+COMMENT
+COMMIT
+Applying migration: migrations/005_EW-05_inventory_moving_average.sql
+BEGIN
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+COMMENT
+CREATE TABLE
+CREATE TABLE
+CREATE FUNCTION
+psql:migrations/005_EW-05_inventory_moving_average.sql:120: NOTICE:  trigger "trg_inventory_ledger_reject_update" for relation "inventory_ledger_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+psql:migrations/005_EW-05_inventory_moving_average.sql:125: NOTICE:  trigger "trg_inventory_ledger_reject_delete" for relation "inventory_ledger_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+CREATE FUNCTION
+psql:migrations/005_EW-05_inventory_moving_average.sql:157: NOTICE:  trigger "trg_inventory_ledger_validate_insert" for relation "inventory_ledger_entries" does not exist, skipping
+DROP TRIGGER
+CREATE TRIGGER
+DO
+psql:migrations/005_EW-05_inventory_moving_average.sql:178: NOTICE:  column "inventory_ledger_entry_id" of relation "gl_entries" already exists, skipping
+ALTER TABLE
+CREATE INDEX
+DO
+COMMIT
+Applying migration: migrations/006_EW-03_sales_delivery.sql
+ALTER TABLE
+COMMENT
+ALTER TABLE
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+CREATE TABLE
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+Applying migration: migrations/007_EW-04_purchase_grni.sql
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+CREATE INDEX
+CREATE INDEX
+CREATE TABLE
+CREATE INDEX
+COMMENT
+COMMENT
+COMMENT
+migration_result=PASS applied_count=7

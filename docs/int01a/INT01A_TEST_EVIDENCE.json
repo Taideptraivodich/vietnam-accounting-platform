@@ -1,0 +1,10 @@
+{
+  "package": "INT-01A_EXECUTABLE_CROSS_MODULE_SMOKE_RUNNER_P0_v1_0",
+  "status": "not_executed_in_chat_sandbox",
+  "reason": "The uploaded dispatch contains documentation only, not the local candidate source tree or PostgreSQL runtime. The included runner is executable and fail-closed; LOCAL-ASSEMBLY-01 must execute it against the assembled candidate tree.",
+  "expected_command": "npm run int01a:smoke",
+  "expected_outputs": [
+    "reports/int01a/int01a-smoke-result-<run-id>.json",
+    "reports/int01a/INT01A_SMOKE_TEST_RESULT_<run-id>.md"
+  ]
+}

@@ -1,0 +1,34 @@
+        table_name        
+--------------------------
+ account_mappings
+ accounts
+ ar_ap_allocations
+ ar_ap_ledger_entries
+ ar_ap_outstanding_cache
+ companies
+ customers
+ delivery_note_lines
+ delivery_notes
+ fiscal_periods
+ gl_entries
+ grni_account_metadata
+ inventory_adjustments
+ inventory_ledger_entries
+ items
+ journal_entries
+ journal_entry_lines
+ opening_stock_documents
+ payment_vouchers
+ purchase_invoice_lines
+ purchase_invoices
+ purchase_receipt_lines
+ purchase_receipts
+ receipt_vouchers
+ sales_invoice_lines
+ sales_invoices
+ stock_balances
+ suppliers
+ tax_ledger_entries
+ warehouses
+(30 rows)
+

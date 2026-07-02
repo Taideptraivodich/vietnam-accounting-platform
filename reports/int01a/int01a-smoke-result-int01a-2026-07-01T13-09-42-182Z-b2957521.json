@@ -1,0 +1,308 @@
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-07-01T13-09-42-182Z-b2957521",
+  "status": "FAIL",
+  "startedAt": "2026-07-01T13:09:42.183Z",
+  "endedAt": "2026-07-01T13:09:42.872Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "nodeEnv": "integration",
+    "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:09:42.184Z",
+      "endedAt": "2026-07-01T13:09:42.184Z",
+      "durationMs": 0,
+      "evidence": {
+        "requiredEnv": [
+          "DATABASE_URL",
+          "NODE_ENV",
+          "MD01_COMPANY_ID",
+          "MD01_INVENTORY_ACCOUNT_ID",
+          "MD01_COGS_ACCOUNT_ID",
+          "MD01_REVENUE_ACCOUNT_ID",
+          "MD01_EXPENSE_ACCOUNT_ID"
+        ],
+        "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-01",
+      "title": "Database connectivity uses real PostgreSQL",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:09:42.184Z",
+      "endedAt": "2026-07-01T13:09:42.236Z",
+      "durationMs": 52,
+      "evidence": {
+        "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+        "database": "local_final_gate",
+        "schema": "public"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-02",
+      "title": "Migrations already applied / freeze-scope tables exist",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:09:42.236Z",
+      "endedAt": "2026-07-01T13:09:42.287Z",
+      "durationMs": 51,
+      "evidence": {
+        "migrationInfo": {
+          "migrationTable": null,
+          "rows": null,
+          "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+        },
+        "resolvedTables": {
+          "companies": "public.companies",
+          "accounts": "public.accounts",
+          "customers": "public.customers",
+          "suppliers": "public.suppliers",
+          "items": "public.items",
+          "warehouses": "public.warehouses",
+          "accountingDocuments": "public.journal_entries",
+          "glEntries": "public.gl_entries",
+          "vatLedger": "public.tax_ledger_entries",
+          "arLedger": "public.ar_ap_ledger_entries",
+          "apLedger": "public.ar_ap_ledger_entries",
+          "inventoryLedger": "public.inventory_ledger_entries",
+          "stockBalances": "public.stock_balances",
+          "salesInvoices": "public.sales_invoices",
+          "purchaseReceipts": "public.purchase_receipts",
+          "purchaseInvoices": "public.purchase_invoices",
+          "migrations": null,
+          "arapAllocations": "public.ar_ap_allocations",
+          "deliveries": "public.delivery_notes"
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-03",
+      "title": "MD-01 seed/preseed real master data exists",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:09:42.287Z",
+      "endedAt": "2026-07-01T13:09:42.330Z",
+      "durationMs": 43,
+      "evidence": {
+        "companyId": "4f9c25fa-f022-4a2c-85f7-6c272ca22825",
+        "companyExists": true,
+        "masterData": {
+          "customers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "suppliers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "items": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "warehouses": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          }
+        },
+        "accountChecks": {
+          "inventory": {
+            "id": "7385d903-84c9-4dd0-ae3a-435f99071fb5",
+            "exists": true
+          },
+          "cogs": {
+            "id": "8d6a9b36-5e60-4c0e-ac64-015b9b6a71e1",
+            "exists": true
+          },
+          "revenue": {
+            "id": "f6ac5640-ffbd-492d-b6c5-9b5d12d268d0",
+            "exists": true
+          },
+          "expense": {
+            "id": "867224c7-495d-4f46-8194-cf121c512df1",
+            "exists": true
+          },
+          "grni": {
+            "id": "ff239792-fda1-4953-b63d-f2135bf1fe00",
+            "exists": true
+          }
+        },
+        "grniSubtype": {
+          "subtypeColumn": "account_subtype",
+          "goodsReceivedNotInvoicedRows": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-04",
+      "title": "Approved module surface adapter/commands are bound",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:09:42.330Z",
+      "endedAt": "2026-07-01T13:09:42.337Z",
+      "durationMs": 7,
+      "evidence": {
+        "mode": "module",
+        "adapterPath": "./src/int01a/int01a-approved-surface-adapter-int01c.mjs",
+        "commandMode": false
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-05",
+      "title": "Post Sales / Delivery baseline through approved surface",
+      "status": "FAIL",
+      "startedAt": "2026-07-01T13:09:42.403Z",
+      "endedAt": "2026-07-01T13:09:42.872Z",
+      "durationMs": 469,
+      "evidence": null,
+      "error": {
+        "name": "SmokeFailure",
+        "message": "postSalesDelivery did not return required document identifiers",
+        "details": {
+          "acceptedKeys": [
+            "accountingDocumentId",
+            "accountingDocumentIds",
+            "salesInvoiceId",
+            "deliveryId",
+            "documentId"
+          ],
+          "result": {
+            "ok": true,
+            "surface": "EW-03 Sales/Delivery approved service surface",
+            "company_id": "4f9c25fa-f022-4a2c-85f7-6c272ca22825",
+            "posting_date": "2026-07-01",
+            "delivery_note_id": "1eff6bcb-63d3-47b0-a7c2-60e3ad60ea23",
+            "sales_invoice_id": "e4ad9349-f47a-4820-9bf1-2d9211058a9e",
+            "delivery_post_result": {
+              "skipped": true,
+              "error": "[INT01B] SalesPostingService did not expose a compatible posting method or all posting attempts failed"
+            },
+            "invoice_post_result": {
+              "method": "postSalesInvoice",
+              "result": {
+                "status": "posted",
+                "id": "e4ad9349-f47a-4820-9bf1-2d9211058a9e",
+                "journal_entry_id": "390a1184-937e-4cc3-897b-85249ce9f02f"
+              }
+            },
+            "wiring": {
+              "transactionManager": "PgTransactionManager.withTransaction",
+              "salesInvoiceRepository": "PostgresSalesInvoiceRepository",
+              "deliveryNoteRepository": "PostgresDeliveryNoteRepository",
+              "salesPostingService": "SalesPostingService",
+              "glWriter": "EW-01 coreAccounting.postAccountingDocument only"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "openIssues": [
+    {
+      "step": "INT01A-05",
+      "title": "Post Sales / Delivery baseline through approved surface",
+      "error": {
+        "name": "SmokeFailure",
+        "message": "postSalesDelivery did not return required document identifiers",
+        "details": {
+          "acceptedKeys": [
+            "accountingDocumentId",
+            "accountingDocumentIds",
+            "salesInvoiceId",
+            "deliveryId",
+            "documentId"
+          ],
+          "result": {
+            "ok": true,
+            "surface": "EW-03 Sales/Delivery approved service surface",
+            "company_id": "4f9c25fa-f022-4a2c-85f7-6c272ca22825",
+            "posting_date": "2026-07-01",
+            "delivery_note_id": "1eff6bcb-63d3-47b0-a7c2-60e3ad60ea23",
+            "sales_invoice_id": "e4ad9349-f47a-4820-9bf1-2d9211058a9e",
+            "delivery_post_result": {
+              "skipped": true,
+              "error": "[INT01B] SalesPostingService did not expose a compatible posting method or all posting attempts failed"
+            },
+            "invoice_post_result": {
+              "method": "postSalesInvoice",
+              "result": {
+                "status": "posted",
+                "id": "e4ad9349-f47a-4820-9bf1-2d9211058a9e",
+                "journal_entry_id": "390a1184-937e-4cc3-897b-85249ce9f02f"
+              }
+            },
+            "wiring": {
+              "transactionManager": "PgTransactionManager.withTransaction",
+              "salesInvoiceRepository": "PostgresSalesInvoiceRepository",
+              "deliveryNoteRepository": "PostgresDeliveryNoteRepository",
+              "salesPostingService": "SalesPostingService",
+              "glWriter": "EW-01 coreAccounting.postAccountingDocument only"
+            }
+          }
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "db": {
+      "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+      "database": "local_final_gate",
+      "schema": "public"
+    },
+    "migrationInfo": {
+      "migrationTable": null,
+      "rows": null,
+      "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+    }
+  },
+  "terminalError": {
+    "name": "SmokeFailure",
+    "message": "postSalesDelivery did not return required document identifiers",
+    "details": {
+      "acceptedKeys": [
+        "accountingDocumentId",
+        "accountingDocumentIds",
+        "salesInvoiceId",
+        "deliveryId",
+        "documentId"
+      ],
+      "result": {
+        "ok": true,
+        "surface": "EW-03 Sales/Delivery approved service surface",
+        "company_id": "4f9c25fa-f022-4a2c-85f7-6c272ca22825",
+        "posting_date": "2026-07-01",
+        "delivery_note_id": "1eff6bcb-63d3-47b0-a7c2-60e3ad60ea23",
+        "sales_invoice_id": "e4ad9349-f47a-4820-9bf1-2d9211058a9e",
+        "delivery_post_result": {
+          "skipped": true,
+          "error": "[INT01B] SalesPostingService did not expose a compatible posting method or all posting attempts failed"
+        },
+        "invoice_post_result": {
+          "method": "postSalesInvoice",
+          "result": {
+            "status": "posted",
+            "id": "e4ad9349-f47a-4820-9bf1-2d9211058a9e",
+            "journal_entry_id": "390a1184-937e-4cc3-897b-85249ce9f02f"
+          }
+        },
+        "wiring": {
+          "transactionManager": "PgTransactionManager.withTransaction",
+          "salesInvoiceRepository": "PostgresSalesInvoiceRepository",
+          "deliveryNoteRepository": "PostgresDeliveryNoteRepository",
+          "salesPostingService": "SalesPostingService",
+          "glWriter": "EW-01 coreAccounting.postAccountingDocument only"
+        }
+      }
+    }
+  }
+}

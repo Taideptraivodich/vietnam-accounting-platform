@@ -1,0 +1,13 @@
+{
+  "name": "ew06-vat-ledger-revision",
+  "version": "1.0.1",
+  "private": true,
+  "description": "EW-06 VAT Ledger targeted revision for integration follow-up",
+  "main": "src/taxLedgerService.js",
+  "scripts": {
+    "test": "node --test test/*.test.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}

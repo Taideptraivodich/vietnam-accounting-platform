@@ -1,0 +1,254 @@
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-07-01T13-14-18-475Z-79fed52b",
+  "status": "FAIL",
+  "startedAt": "2026-07-01T13:14:18.476Z",
+  "endedAt": "2026-07-01T13:14:19.121Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "nodeEnv": "integration",
+    "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:14:18.476Z",
+      "endedAt": "2026-07-01T13:14:18.477Z",
+      "durationMs": 1,
+      "evidence": {
+        "requiredEnv": [
+          "DATABASE_URL",
+          "NODE_ENV",
+          "MD01_COMPANY_ID",
+          "MD01_INVENTORY_ACCOUNT_ID",
+          "MD01_COGS_ACCOUNT_ID",
+          "MD01_REVENUE_ACCOUNT_ID",
+          "MD01_EXPENSE_ACCOUNT_ID"
+        ],
+        "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-01",
+      "title": "Database connectivity uses real PostgreSQL",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:14:18.477Z",
+      "endedAt": "2026-07-01T13:14:18.528Z",
+      "durationMs": 51,
+      "evidence": {
+        "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+        "database": "local_final_gate",
+        "schema": "public"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-02",
+      "title": "Migrations already applied / freeze-scope tables exist",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:14:18.528Z",
+      "endedAt": "2026-07-01T13:14:18.570Z",
+      "durationMs": 42,
+      "evidence": {
+        "migrationInfo": {
+          "migrationTable": null,
+          "rows": null,
+          "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+        },
+        "resolvedTables": {
+          "companies": "public.companies",
+          "accounts": "public.accounts",
+          "customers": "public.customers",
+          "suppliers": "public.suppliers",
+          "items": "public.items",
+          "warehouses": "public.warehouses",
+          "accountingDocuments": "public.journal_entries",
+          "glEntries": "public.gl_entries",
+          "vatLedger": "public.tax_ledger_entries",
+          "arLedger": "public.ar_ap_ledger_entries",
+          "apLedger": "public.ar_ap_ledger_entries",
+          "inventoryLedger": "public.inventory_ledger_entries",
+          "stockBalances": "public.stock_balances",
+          "salesInvoices": "public.sales_invoices",
+          "purchaseReceipts": "public.purchase_receipts",
+          "purchaseInvoices": "public.purchase_invoices",
+          "migrations": null,
+          "arapAllocations": "public.ar_ap_allocations",
+          "deliveries": "public.delivery_notes"
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-03",
+      "title": "MD-01 seed/preseed real master data exists",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:14:18.570Z",
+      "endedAt": "2026-07-01T13:14:18.615Z",
+      "durationMs": 45,
+      "evidence": {
+        "companyId": "396b235e-d84a-4d23-be86-d307ab9182bb",
+        "companyExists": true,
+        "masterData": {
+          "customers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "suppliers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "items": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "warehouses": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          }
+        },
+        "accountChecks": {
+          "inventory": {
+            "id": "cd2ef88a-d623-4ae9-b010-ea1aaac8e958",
+            "exists": true
+          },
+          "cogs": {
+            "id": "69b80abb-8272-4e8a-a917-94525d28e6be",
+            "exists": true
+          },
+          "revenue": {
+            "id": "1aad9f0e-7ba6-42b5-8c30-e5d80dd9ac99",
+            "exists": true
+          },
+          "expense": {
+            "id": "9c505bf7-5036-41b6-b25b-b7e1e3452992",
+            "exists": true
+          },
+          "grni": {
+            "id": "aae69b5c-adee-4676-a5be-d1e9c25c113f",
+            "exists": true
+          }
+        },
+        "grniSubtype": {
+          "subtypeColumn": "account_subtype",
+          "goodsReceivedNotInvoicedRows": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-04",
+      "title": "Approved module surface adapter/commands are bound",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:14:18.615Z",
+      "endedAt": "2026-07-01T13:14:18.620Z",
+      "durationMs": 5,
+      "evidence": {
+        "mode": "module",
+        "adapterPath": "./src/int01a/int01a-approved-surface-adapter-int01c.mjs",
+        "commandMode": false
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-05",
+      "title": "Post Sales / Delivery baseline through approved surface",
+      "status": "FAIL",
+      "startedAt": "2026-07-01T13:14:18.692Z",
+      "endedAt": "2026-07-01T13:14:19.120Z",
+      "durationMs": 428,
+      "evidence": null,
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Some accounting documents have no GL entries",
+        "details": {
+          "missingDocs": [
+            "3dfc15a7-6acf-423d-ae50-e1bb3e3314e1"
+          ],
+          "documentIds": [
+            "a2fca36a-05d3-494e-a540-0d7159590247",
+            "3dfc15a7-6acf-423d-ae50-e1bb3e3314e1"
+          ],
+          "sums": [
+            {
+              "documentId": "a2fca36a-05d3-494e-a540-0d7159590247",
+              "debit": 1100,
+              "credit": 1100,
+              "rowCount": 3,
+              "companyCount": 1
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "openIssues": [
+    {
+      "step": "INT01A-05",
+      "title": "Post Sales / Delivery baseline through approved surface",
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Some accounting documents have no GL entries",
+        "details": {
+          "missingDocs": [
+            "3dfc15a7-6acf-423d-ae50-e1bb3e3314e1"
+          ],
+          "documentIds": [
+            "a2fca36a-05d3-494e-a540-0d7159590247",
+            "3dfc15a7-6acf-423d-ae50-e1bb3e3314e1"
+          ],
+          "sums": [
+            {
+              "documentId": "a2fca36a-05d3-494e-a540-0d7159590247",
+              "debit": 1100,
+              "credit": 1100,
+              "rowCount": 3,
+              "companyCount": 1
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "db": {
+      "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+      "database": "local_final_gate",
+      "schema": "public"
+    },
+    "migrationInfo": {
+      "migrationTable": null,
+      "rows": null,
+      "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+    }
+  },
+  "terminalError": {
+    "name": "SmokeFailure",
+    "message": "Some accounting documents have no GL entries",
+    "details": {
+      "missingDocs": [
+        "3dfc15a7-6acf-423d-ae50-e1bb3e3314e1"
+      ],
+      "documentIds": [
+        "a2fca36a-05d3-494e-a540-0d7159590247",
+        "3dfc15a7-6acf-423d-ae50-e1bb3e3314e1"
+      ],
+      "sums": [
+        {
+          "documentId": "a2fca36a-05d3-494e-a540-0d7159590247",
+          "debit": 1100,
+          "credit": 1100,
+          "rowCount": 3,
+          "companyCount": 1
+        }
+      ]
+    }
+  }
+}

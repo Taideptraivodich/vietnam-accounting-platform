@@ -1,0 +1,80 @@
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-07-01T11-16-41-244Z-dc959613",
+  "status": "FAIL",
+  "startedAt": "2026-07-01T11:16:41.245Z",
+  "endedAt": "2026-07-01T11:16:41.246Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "databaseUrlRedacted": null
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "FAIL",
+      "startedAt": "2026-07-01T11:16:41.245Z",
+      "endedAt": "2026-07-01T11:16:41.246Z",
+      "durationMs": 1,
+      "evidence": null,
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Missing required environment variables",
+        "details": {
+          "missing": [
+            "DATABASE_URL",
+            "NODE_ENV",
+            "MD01_COMPANY_ID",
+            "MD01_INVENTORY_ACCOUNT_ID",
+            "MD01_COGS_ACCOUNT_ID",
+            "MD01_REVENUE_ACCOUNT_ID",
+            "MD01_EXPENSE_ACCOUNT_ID"
+          ],
+          "reproduction": "Export the variables listed in EXPECTED_ENVIRONMENT_VARIABLES.md and rerun npm run int01a:smoke."
+        }
+      }
+    }
+  ],
+  "openIssues": [
+    {
+      "step": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Missing required environment variables",
+        "details": {
+          "missing": [
+            "DATABASE_URL",
+            "NODE_ENV",
+            "MD01_COMPANY_ID",
+            "MD01_INVENTORY_ACCOUNT_ID",
+            "MD01_COGS_ACCOUNT_ID",
+            "MD01_REVENUE_ACCOUNT_ID",
+            "MD01_EXPENSE_ACCOUNT_ID"
+          ],
+          "reproduction": "Export the variables listed in EXPECTED_ENVIRONMENT_VARIABLES.md and rerun npm run int01a:smoke."
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "db": null,
+    "migrationInfo": null
+  },
+  "terminalError": {
+    "name": "SmokeFailure",
+    "message": "Missing required environment variables",
+    "details": {
+      "missing": [
+        "DATABASE_URL",
+        "NODE_ENV",
+        "MD01_COMPANY_ID",
+        "MD01_INVENTORY_ACCOUNT_ID",
+        "MD01_COGS_ACCOUNT_ID",
+        "MD01_REVENUE_ACCOUNT_ID",
+        "MD01_EXPENSE_ACCOUNT_ID"
+      ],
+      "reproduction": "Export the variables listed in EXPECTED_ENVIRONMENT_VARIABLES.md and rerun npm run int01a:smoke."
+    }
+  }
+}

@@ -1,0 +1,4 @@
+16: Pulling from library/postgres
+Digest: sha256:fe03a7605299a34ddf5e4f285dff78c3d7190a576b3c6b46f2fcff69f4bffd54
+Status: Image is up to date for postgres:16
+docker.io/library/postgres:16

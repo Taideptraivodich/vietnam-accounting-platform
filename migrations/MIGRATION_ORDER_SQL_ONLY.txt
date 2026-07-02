@@ -1,0 +1,7 @@
+001_EW-01_gl_foundation.sql
+002_EW-06_vat_ledger.sql
+003_EW-02_ar_ap_ledger_allocations.sql
+004_MD-01_master_data_schema.sql
+005_EW-05_inventory_moving_average.sql
+006_EW-03_sales_delivery.sql
+007_EW-04_purchase_grni.sql

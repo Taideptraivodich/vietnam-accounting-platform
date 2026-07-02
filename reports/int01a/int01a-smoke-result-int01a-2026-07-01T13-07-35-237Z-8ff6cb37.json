@@ -1,0 +1,201 @@
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-07-01T13-07-35-237Z-8ff6cb37",
+  "status": "FAIL",
+  "startedAt": "2026-07-01T13:07:35.238Z",
+  "endedAt": "2026-07-01T13:07:35.583Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "nodeEnv": "integration",
+    "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:07:35.238Z",
+      "endedAt": "2026-07-01T13:07:35.239Z",
+      "durationMs": 1,
+      "evidence": {
+        "requiredEnv": [
+          "DATABASE_URL",
+          "NODE_ENV",
+          "MD01_COMPANY_ID",
+          "MD01_INVENTORY_ACCOUNT_ID",
+          "MD01_COGS_ACCOUNT_ID",
+          "MD01_REVENUE_ACCOUNT_ID",
+          "MD01_EXPENSE_ACCOUNT_ID"
+        ],
+        "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-01",
+      "title": "Database connectivity uses real PostgreSQL",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:07:35.239Z",
+      "endedAt": "2026-07-01T13:07:35.463Z",
+      "durationMs": 224,
+      "evidence": {
+        "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+        "database": "local_final_gate",
+        "schema": "public"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-02",
+      "title": "Migrations already applied / freeze-scope tables exist",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:07:35.463Z",
+      "endedAt": "2026-07-01T13:07:35.506Z",
+      "durationMs": 43,
+      "evidence": {
+        "migrationInfo": {
+          "migrationTable": null,
+          "rows": null,
+          "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+        },
+        "resolvedTables": {
+          "companies": "public.companies",
+          "accounts": "public.accounts",
+          "customers": "public.customers",
+          "suppliers": "public.suppliers",
+          "items": "public.items",
+          "warehouses": "public.warehouses",
+          "accountingDocuments": "public.journal_entries",
+          "glEntries": "public.gl_entries",
+          "vatLedger": "public.tax_ledger_entries",
+          "arLedger": "public.ar_ap_ledger_entries",
+          "apLedger": "public.ar_ap_ledger_entries",
+          "inventoryLedger": "public.inventory_ledger_entries",
+          "stockBalances": "public.stock_balances",
+          "salesInvoices": "public.sales_invoices",
+          "purchaseReceipts": "public.purchase_receipts",
+          "purchaseInvoices": "public.purchase_invoices",
+          "migrations": null,
+          "arapAllocations": "public.ar_ap_allocations",
+          "deliveries": "public.delivery_notes"
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-03",
+      "title": "MD-01 seed/preseed real master data exists",
+      "status": "PASS",
+      "startedAt": "2026-07-01T13:07:35.506Z",
+      "endedAt": "2026-07-01T13:07:35.577Z",
+      "durationMs": 71,
+      "evidence": {
+        "companyId": "c6d4619e-876a-4f04-82db-dda6367a86c7",
+        "companyExists": true,
+        "masterData": {
+          "customers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "suppliers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "items": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "warehouses": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          }
+        },
+        "accountChecks": {
+          "inventory": {
+            "id": "b1dc585f-495e-4e40-836f-bc89b216f584",
+            "exists": true
+          },
+          "cogs": {
+            "id": "93c930b7-a08c-4cd3-b8c2-a47abbaebceb",
+            "exists": true
+          },
+          "revenue": {
+            "id": "503a8792-e36b-4e2e-9fd9-4db5395eeafa",
+            "exists": true
+          },
+          "expense": {
+            "id": "a5a3e651-5937-4fbe-9308-ee745c699d64",
+            "exists": true
+          },
+          "grni": {
+            "id": "cf889a7b-5798-4922-8e56-660187ea4e1d",
+            "exists": true
+          }
+        },
+        "grniSubtype": {
+          "subtypeColumn": "account_subtype",
+          "goodsReceivedNotInvoicedRows": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-04",
+      "title": "Approved module surface adapter/commands are bound",
+      "status": "FAIL",
+      "startedAt": "2026-07-01T13:07:35.577Z",
+      "endedAt": "2026-07-01T13:07:35.583Z",
+      "durationMs": 6,
+      "evidence": null,
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Unable to import INT-01A adapter module",
+        "details": {
+          "adapterPath": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-approved-surface-adapter-int01c.mjs",
+          "cause": "Unexpected identifier 'InventoryIssueAdapter'",
+          "reproduction": "Check INT01A_ADAPTER_MODULE=./src/int01a/int01a-approved-surface-adapter-int01c.mjs"
+        }
+      }
+    }
+  ],
+  "openIssues": [
+    {
+      "step": "INT01A-04",
+      "title": "Approved module surface adapter/commands are bound",
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Unable to import INT-01A adapter module",
+        "details": {
+          "adapterPath": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-approved-surface-adapter-int01c.mjs",
+          "cause": "Unexpected identifier 'InventoryIssueAdapter'",
+          "reproduction": "Check INT01A_ADAPTER_MODULE=./src/int01a/int01a-approved-surface-adapter-int01c.mjs"
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "db": {
+      "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+      "database": "local_final_gate",
+      "schema": "public"
+    },
+    "migrationInfo": {
+      "migrationTable": null,
+      "rows": null,
+      "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+    }
+  },
+  "terminalError": {
+    "name": "SmokeFailure",
+    "message": "Unable to import INT-01A adapter module",
+    "details": {
+      "adapterPath": "F:\\vap\\rerun_after_int01b\\local_candidate_int01b\\src\\int01a\\int01a-approved-surface-adapter-int01c.mjs",
+      "cause": "Unexpected identifier 'InventoryIssueAdapter'",
+      "reproduction": "Check INT01A_ADAPTER_MODULE=./src/int01a/int01a-approved-surface-adapter-int01c.mjs"
+    }
+  }
+}

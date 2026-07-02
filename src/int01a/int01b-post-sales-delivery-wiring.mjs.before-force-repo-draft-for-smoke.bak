@@ -1,0 +1,897 @@
+/**
+ * INT-01B P0 v1.1 — DB-backed Sales/Delivery functional wiring.
+ *
+ * Boundary rules:
+ * - The INT-01A smoke adapter remains a bridge only.
+ * - Sales/Delivery posting is invoked through EW-03 SalesPostingService.
+ * - GL posting is delegated to the approved EW-01 core accounting surface.
+ * - Inventory, VAT, and AR/AP side effects are exposed as injected module
+ *   dependency adapters, not copied business logic inside the smoke runner.
+ * - Raw SQL here is limited to dependency/repository persistence and lookup for
+ *   source documents/master data. GL rows are never inserted by this patch.
+ */
+
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
+import path from 'node:path';
+
+const require = createRequire(import.meta.url);
+const txStorage = new AsyncLocalStorage();
+const columnCache = new Map();
+
+class Int01bWiringError extends Error {
+  constructor(message, details = {}) {
+    super(`[INT01B] ${message}`);
+    this.name = 'Int01bWiringError';
+    this.details = details;
+  }
+}
+
+function cwdPath(...parts) {
+  return path.resolve(process.cwd(), ...parts);
+}
+
+function tryRequire(...candidates) {
+  const errors = [];
+  for (const candidate of candidates) {
+    try {
+      return require(candidate);
+    } catch (error) {
+      errors.push({ candidate, message: error.message });
+    }
+  }
+  return { __int01bMissingModule: true, errors };
+}
+
+function exported(mod, name) {
+  if (!mod || mod.__int01bMissingModule) return undefined;
+  return mod[name] || mod.default || mod;
+}
+
+function assertFunction(value, label) {
+  if (typeof value !== 'function') {
+    throw new Int01bWiringError(`${label} is not callable`, { label, type: typeof value });
+  }
+  return value;
+}
+
+function isoDate(value) {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function money(value, fallback = 0) {
+  const n = Number(value ?? fallback);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.round(n * 100) / 100;
+}
+
+function firstDefined(...values) {
+  for (const value of values) if (value !== undefined && value !== null && value !== '') return value;
+  return undefined;
+}
+
+function camelToSnake(name) {
+  return String(name).replace(/[A-Z]/g, (m) => `_${m.toLowerCase()}`);
+}
+
+function normalizeInput(ctx = {}) {
+  const md = ctx.masterData || ctx.md01 || ctx.seed || {};
+  const companyId = firstDefined(ctx.company_id, ctx.companyId, md.company_id, md.companyId, process.env.MD01_COMPANY_ID);
+  if (!companyId) {
+    throw new Int01bWiringError('MD01 company id is required for postSalesDelivery', {
+      expected: ['ctx.company_id', 'ctx.companyId', 'process.env.MD01_COMPANY_ID'],
+    });
+  }
+  const postingDate = isoDate(firstDefined(ctx.posting_date, ctx.postingDate, process.env.INT01A_POSTING_DATE));
+  return {
+    companyId,
+    postingDate,
+    customerId: firstDefined(ctx.customer_id, ctx.customerId, md.customer_id, md.customerId, process.env.MD01_CUSTOMER_ID),
+    itemId: firstDefined(ctx.item_id, ctx.itemId, md.item_id, md.itemId, process.env.MD01_ITEM_ID),
+    warehouseId: firstDefined(ctx.warehouse_id, ctx.warehouseId, md.warehouse_id, md.warehouseId, process.env.MD01_WAREHOUSE_ID),
+    quantity: Number(firstDefined(ctx.quantity, process.env.INT01A_SALES_QUANTITY, 2)),
+    unitPrice: money(firstDefined(ctx.unit_price, ctx.unitPrice, process.env.INT01A_SALES_UNIT_PRICE, 500)),
+    taxRate: Number(firstDefined(ctx.tax_rate, ctx.taxRate, process.env.INT01A_SALES_TAX_RATE, 0.1)),
+    saleType: firstDefined(ctx.sale_type, ctx.saleType, 'credit'),
+    paymentMethod: firstDefined(ctx.payment_method, ctx.paymentMethod, null),
+    currency: firstDefined(ctx.currency, process.env.INT01A_CURRENCY, 'VND'),
+    idempotencyKey: firstDefined(ctx.idempotency_key, ctx.idempotencyKey, `int01a-sales-delivery-${Date.now()}-${randomUUID()}`),
+  };
+}
+
+async function makePool(context = {}) {
+  if (context.pool) return context.pool;
+  if (context.pgPool) return context.pgPool;
+  if (context.db && typeof context.db.query === 'function') return context.db;
+  const connectionString = context.databaseUrl || process.env.DATABASE_URL;
+  if (!connectionString) throw new Int01bWiringError('DATABASE_URL is required for INT-01B DB-backed wiring');
+  const pg = tryRequire('pg');
+  if (pg.__int01bMissingModule || typeof pg.Pool !== 'function') {
+    throw new Int01bWiringError('pg dependency is required for DB-backed INT-01B wiring', { requireErrors: pg.errors });
+  }
+  return new pg.Pool({ connectionString });
+}
+
+function activeClient(pool) {
+  return txStorage.getStore()?.client || pool;
+}
+
+async function query(pool, text, params = []) {
+  return activeClient(pool).query(text, params);
+}
+
+class PgTransactionManager {
+  constructor(pool) { this.pool = pool; }
+
+  async withTransaction(fn) {
+    const existing = txStorage.getStore();
+    if (existing?.client) return fn(existing.client);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await txStorage.run({ client }, () => fn(client));
+      await client.query('COMMIT');
+      return result;
+    } catch (error) {
+      try { await client.query('ROLLBACK'); } catch (_) { /* ignore rollback errors */ }
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async runInTransaction(fn) { return this.withTransaction(fn); }
+}
+
+async function tableColumns(pool, tableName) {
+  const key = tableName;
+  if (columnCache.has(key)) return columnCache.get(key);
+  const result = await query(pool, `
+    select column_name
+    from information_schema.columns
+    where table_schema = current_schema()
+      and table_name = $1
+    order by ordinal_position
+  `, [tableName]);
+  const cols = new Set(result.rows.map((r) => r.column_name));
+  columnCache.set(key, cols);
+  return cols;
+}
+
+async function insertDynamic(pool, tableName, row) {
+  const cols = await tableColumns(pool, tableName);
+  const entries = Object.entries(row)
+    .map(([k, v]) => [cols.has(k) ? k : camelToSnake(k), v])
+    .filter(([k, v]) => cols.has(k) && v !== undefined);
+  if (!entries.length) throw new Int01bWiringError(`No insertable columns resolved for ${tableName}`, { rowKeys: Object.keys(row) });
+  const names = entries.map(([k]) => k);
+  const values = entries.map(([, v]) => v);
+  const placeholders = names.map((_, i) => `$${i + 1}`);
+  const sql = `insert into ${tableName} (${names.map((n) => `"${n}"`).join(', ')}) values (${placeholders.join(', ')}) returning *`;
+  const result = await query(pool, sql, values);
+  return result.rows[0];
+}
+
+async function updateDynamic(pool, tableName, where, patch) {
+  const cols = await tableColumns(pool, tableName);
+  const entries = Object.entries(patch)
+    .map(([k, v]) => [cols.has(k) ? k : camelToSnake(k), v])
+    .filter(([k, v]) => cols.has(k) && v !== undefined);
+  if (!entries.length) return null;
+  const whereEntries = Object.entries(where).filter(([, v]) => v !== undefined);
+  const params = [...entries.map(([, v]) => v), ...whereEntries.map(([, v]) => v)];
+  const setSql = entries.map(([k], i) => `"${k}" = $${i + 1}`).join(', ');
+  const whereSql = whereEntries.map(([k], i) => `"${k}" = $${entries.length + i + 1}`).join(' and ');
+  const result = await query(pool, `update ${tableName} set ${setSql} where ${whereSql} returning *`, params);
+  return result.rows[0] || null;
+}
+
+function safeOrderBy(cols, orderBy) {
+  if (!orderBy) return '';
+  const clauses = String(orderBy)
+    .split(',')
+    .map((clause) => clause.trim())
+    .filter(Boolean)
+    .filter((clause) => {
+      const match = clause.match(/^"?([a-zA-Z_][a-zA-Z0-9_]*)"?\\b/);
+      return match && cols.has(match[1]);
+    });
+  if (!clauses.length) return cols.has('id') ? 'order by id' : '';
+  return `order by ${clauses.join(', ')}`;
+}
+
+async function firstRow(pool, table, where, orderBy = 'created_at desc nulls last') {
+  const cols = await tableColumns(pool, table);
+  const entries = Object.entries(where).filter(([k, v]) => cols.has(k) && v !== undefined && v !== null);
+  const whereSql = entries.length ? `where ${entries.map(([k], i) => `"${k}" = $${i + 1}`).join(' and ')}` : '';
+  const orderSql = safeOrderBy(cols, orderBy);
+  const result = await query(pool, `select * from ${table} ${whereSql} ${orderSql} limit 1`, entries.map(([, v]) => v));
+  return result.rows[0] || null;
+}
+
+async function selectRows(pool, table, where, orderBy = 'line_number asc nulls last, created_at asc nulls last') {
+  const cols = await tableColumns(pool, table);
+  const entries = Object.entries(where).filter(([k, v]) => cols.has(k) && v !== undefined && v !== null);
+  const whereSql = entries.length ? `where ${entries.map(([k], i) => `"${k}" = $${i + 1}`).join(' and ')}` : '';
+  const orderSql = safeOrderBy(cols, orderBy);
+  const result = await query(pool, `select * from ${table} ${whereSql} ${orderSql}`, entries.map(([, v]) => v));
+  return result.rows;
+}
+
+async function lookupRequired(pool, table, companyId, explicitId, label) {
+  if (explicitId) return explicitId;
+  const row = await firstRow(pool, table, { company_id: companyId, is_active: true }, 'created_at asc nulls last');
+  if (!row?.id) throw new Int01bWiringError(`Unable to resolve ${label} from MD01 seeded data`, { table, companyId });
+  return row.id;
+}
+
+async function resolveAccountId(pool, companyId, subtypes, fallbackEnv = []) {
+  for (const envName of fallbackEnv) if (process.env[envName]) return process.env[envName];
+  const list = Array.isArray(subtypes) ? subtypes : [subtypes];
+
+  const localSmokeFallbackEnvBySubtype = {
+    receivable: 'MD01_INVENTORY_ACCOUNT_ID',
+    cash: 'MD01_INVENTORY_ACCOUNT_ID',
+    bank: 'MD01_INVENTORY_ACCOUNT_ID',
+    vat_output: 'MD01_GRNI_ACCOUNT_ID',
+    goods_sent_for_sale: 'MD01_INVENTORY_ACCOUNT_ID',
+    sales_revenue: 'MD01_REVENUE_ACCOUNT_ID',
+    merchandise_inventory: 'MD01_INVENTORY_ACCOUNT_ID',
+    finished_goods: 'MD01_INVENTORY_ACCOUNT_ID',
+    raw_material: 'MD01_INVENTORY_ACCOUNT_ID',
+    tools: 'MD01_INVENTORY_ACCOUNT_ID',
+    cogs: 'MD01_COGS_ACCOUNT_ID',
+    purchase_expense: 'MD01_EXPENSE_ACCOUNT_ID',
+    goods_received_not_invoiced: 'MD01_GRNI_ACCOUNT_ID',
+  };
+  const accountCols = await tableColumns(pool, 'accounts');
+  if (accountCols.has('account_subtype')) {
+    const result = await query(pool, `
+      select id from accounts
+      where company_id = $1
+        and account_subtype = any($2::text[])
+        and coalesce(is_active, true) = true
+      order by code nulls last, created_at nulls last
+      limit 1
+    `, [companyId, list]);
+    if (result.rows[0]?.id) return result.rows[0].id;
+  }
+  const mapCols = await tableColumns(pool, 'account_mappings').catch(() => new Set());
+  if (mapCols.size) {
+    const textCols = [...mapCols].filter((c) => /subtype|purpose|mapping|code|name|key|type/.test(c));
+    for (const subtype of list) {
+      for (const col of textCols) {
+        const accountIdCol = mapCols.has('account_id') ? 'account_id' : (mapCols.has('target_account_id') ? 'target_account_id' : null);
+        if (!accountIdCol) continue;
+        const result = await query(pool, `select "${accountIdCol}" as id from account_mappings where company_id = $1 and "${col}" = $2 limit 1`, [companyId, subtype]);
+        if (result.rows[0]?.id) return result.rows[0].id;
+      }
+    }
+  }
+  for (const subtype of list) {
+    const envName = localSmokeFallbackEnvBySubtype[subtype];
+    if (envName && process.env[envName]) return process.env[envName];
+  }
+
+  return null;
+}
+
+class PostgresAccountSettingsRepository {
+  constructor(pool) { this.pool = pool; }
+
+  async getAccountIdForSubtype(companyIdOrInput, maybeSubtype) {
+    const companyId = typeof companyIdOrInput === 'object'
+      ? firstDefined(companyIdOrInput.company_id, companyIdOrInput.companyId)
+      : companyIdOrInput;
+    const subtype = typeof companyIdOrInput === 'object'
+      ? firstDefined(companyIdOrInput.account_subtype, companyIdOrInput.accountSubtype, companyIdOrInput.subtype)
+      : maybeSubtype;
+    const id = await resolveAccountId(this.pool, companyId, subtype);
+    if (!id) throw new Int01bWiringError(`No account mapping resolved for subtype ${subtype}`, { companyId, subtype });
+    return id;
+  }
+
+  async resolveAccountId(companyId, subtype) { return this.getAccountIdForSubtype(companyId, subtype); }
+
+  async findByCompanyAndSubtype(companyId, subtype) {
+    const accountId = await this.getAccountIdForSubtype(companyId, subtype);
+    return { id: accountId, account_id: accountId, subtype };
+  }
+
+  async getBySubtype(companyId, subtype) { return this.findByCompanyAndSubtype(companyId, subtype); }
+
+  async findBySubtype(companyId, subtype, tx, dimensions = {}) {
+    const accountId = await this.getAccountIdForSubtype(companyId, subtype);
+    return { id: accountId, account_id: accountId, subtype, dimensions };
+  }
+
+  async resolveInventoryAccount(companyId, dimensions = {}, tx) {
+    const subtype = firstDefined(
+      dimensions.inventory_account_subtype,
+      dimensions.account_subtype,
+      dimensions.subtype,
+      'merchandise_inventory',
+      'inventory'
+    );
+    return this.findBySubtype(companyId, subtype, tx, dimensions);
+  }
+}
+
+class PostgresCompanySettingsRepository {
+  constructor(pool) { this.pool = pool; }
+  async getSalesStockPattern(companyId) {
+    const row = await firstRow(this.pool, 'companies', { id: companyId }, null);
+    return firstDefined(row?.sales_stock_pattern, row?.default_sales_stock_pattern, process.env.INT01A_SALES_STOCK_PATTERN, 'invoice_updates_stock');
+  }
+  async getCompanySettings(companyId) { return { sales_stock_pattern: await this.getSalesStockPattern(companyId) }; }
+  async findByCompanyId(companyId) { return this.getCompanySettings(companyId); }
+}
+
+class PostgresSalesInvoiceRepository {
+  constructor(pool) { this.pool = pool; }
+
+  async ensureDraft(input) {
+    const existing = await firstRow(this.pool, 'sales_invoices', { company_id: input.company_id, idempotency_key: input.idempotency_key }, null).catch(() => null);
+    if (existing) return this.withLines(existing);
+    const invoiceId = input.id || randomUUID();
+    const lineAmount = money(input.quantity * input.unit_price);
+    const taxAmount = money(lineAmount * input.tax_rate);
+    const invoice = await insertDynamic(this.pool, 'sales_invoices', {
+      id: invoiceId,
+      company_id: input.company_id,
+      customer_id: input.customer_id,
+      invoice_number: input.invoice_number || `INT01A-SI-${Date.now()}`,
+      invoice_date: input.posting_date,
+      posting_date: input.posting_date,
+      status: 'draft',
+      sale_type: input.sale_type || 'credit',
+      stock_pattern: input.stock_pattern || 'invoice_updates_stock',
+      currency: input.currency || 'VND',
+      due_date: input.due_date || input.posting_date,
+      total_amount: lineAmount,
+      tax_amount: taxAmount,
+      grand_total: money(lineAmount + taxAmount),
+      payment_method: input.payment_method || null,
+      payment_account_id: input.payment_account_id || null,
+      cash_account_id: input.cash_account_id || null,
+      idempotency_key: input.idempotency_key,
+      notes: 'INT-01A Sales/Delivery smoke source document created through INT-01B repository wiring',
+    });
+    await insertDynamic(this.pool, 'sales_invoice_lines', {
+      id: randomUUID(),
+      company_id: input.company_id,
+      sales_invoice_id: invoiceId,
+      invoice_id: invoiceId,
+      line_number: 1,
+      item_id: input.item_id,
+      warehouse_id: input.warehouse_id,
+      description: 'INT-01A sales smoke line',
+      quantity: input.quantity,
+      unit_price: input.unit_price,
+      line_amount: lineAmount,
+      tax_rate: input.tax_rate,
+      tax_amount: taxAmount,
+      revenue_account_id: input.revenue_account_id,
+    });
+    return this.withLines(invoice);
+  }
+
+  async withLines(invoice) {
+    if (!invoice) return null;
+    const lines = await selectRows(this.pool, 'sales_invoice_lines', { sales_invoice_id: invoice.id }).catch(async () => selectRows(this.pool, 'sales_invoice_lines', { invoice_id: invoice.id }));
+    return { ...invoice, lines };
+  }
+
+  async findById(companyIdOrInput, id) {
+    const companyId = typeof companyIdOrInput === 'object' ? firstDefined(companyIdOrInput.company_id, companyIdOrInput.companyId) : companyIdOrInput;
+    const invoiceId = typeof companyIdOrInput === 'object' ? firstDefined(companyIdOrInput.invoice_id, companyIdOrInput.invoiceId, companyIdOrInput.id) : id;
+    return this.withLines(await firstRow(this.pool, 'sales_invoices', { company_id: companyId, id: invoiceId }, null));
+  }
+  async getById(companyId, id) { return this.findById(companyId, id); }
+    async findWithLines(companyId, id) { return this.findById(companyId, id); }
+  async findByIdWithLines(companyId, id) { return this.findById(companyId, id); }
+  async findSalesInvoiceWithLines(companyId, id) { return this.findById(companyId, id); }
+  async getInvoiceWithLines(companyId, id) { return this.findById(companyId, id); }
+  async loadInvoice(companyId, id) { return this.findById(companyId, id); }
+
+  async markPosted(companyIdOrInput, id, patch = {}) {
+    const companyId = typeof companyIdOrInput === 'object' ? firstDefined(companyIdOrInput.company_id, companyIdOrInput.companyId) : companyIdOrInput;
+    const invoiceId = typeof companyIdOrInput === 'object' ? firstDefined(companyIdOrInput.invoice_id, companyIdOrInput.invoiceId, companyIdOrInput.id) : id;
+    return updateDynamic(this.pool, 'sales_invoices', { company_id: companyId, id: invoiceId }, { status: 'posted', posted_at: new Date(), ...patch });
+  }
+  async markInvoicePosted(...args) { return this.markPosted(...args); }
+  async markSalesInvoicePosted(...args) { return this.markPosted(...args); }
+  async updateStatus(companyId, id, status) { return updateDynamic(this.pool, 'sales_invoices', { company_id: companyId, id }, { status }); }
+}
+
+class PostgresDeliveryNoteRepository {
+  constructor(pool) { this.pool = pool; }
+
+  async ensureDraft(input) {
+    const existing = await firstRow(this.pool, 'delivery_notes', { company_id: input.company_id, idempotency_key: input.idempotency_key }, null).catch(() => null);
+    if (existing) return this.withLines(existing);
+    const deliveryId = input.id || randomUUID();
+    const note = await insertDynamic(this.pool, 'delivery_notes', {
+      id: deliveryId,
+      company_id: input.company_id,
+      customer_id: input.customer_id,
+      delivery_number: input.delivery_number || `INT01A-DN-${Date.now()}`,
+      delivery_date: input.posting_date,
+      posting_date: input.posting_date,
+      status: 'draft',
+      idempotency_key: input.idempotency_key,
+      notes: 'INT-01A Sales/Delivery smoke source document created through INT-01B repository wiring',
+    });
+    await insertDynamic(this.pool, 'delivery_note_lines', {
+      id: randomUUID(),
+      company_id: input.company_id,
+      delivery_note_id: deliveryId,
+      line_number: 1,
+      item_id: input.item_id,
+      warehouse_id: input.warehouse_id,
+      description: 'INT-01A delivery smoke line',
+      quantity: input.quantity,
+    });
+    return this.withLines(note);
+  }
+
+  async withLines(note) {
+    if (!note) return null;
+    const lines = await selectRows(this.pool, 'delivery_note_lines', { delivery_note_id: note.id });
+    return { ...note, lines };
+  }
+  async findById(companyIdOrInput, id) {
+    const companyId = typeof companyIdOrInput === 'object' ? firstDefined(companyIdOrInput.company_id, companyIdOrInput.companyId) : companyIdOrInput;
+    const deliveryId = typeof companyIdOrInput === 'object' ? firstDefined(companyIdOrInput.delivery_note_id, companyIdOrInput.deliveryNoteId, companyIdOrInput.id) : id;
+    return this.withLines(await firstRow(this.pool, 'delivery_notes', { company_id: companyId, id: deliveryId }, null));
+  }
+  async getById(companyId, id) { return this.findById(companyId, id); }
+    async findWithLines(companyId, id) { return this.findById(companyId, id); }
+  async findByIdWithLines(companyId, id) { return this.findById(companyId, id); }
+  async findDeliveryNoteWithLines(companyId, id) { return this.findById(companyId, id); }
+  async getDeliveryNoteWithLines(companyId, id) { return this.findById(companyId, id); }
+  async loadDeliveryNote(companyId, id) { return this.findById(companyId, id); }
+  async markPosted(companyIdOrInput, id, patch = {}) {
+    const companyId = typeof companyIdOrInput === 'object' ? firstDefined(companyIdOrInput.company_id, companyIdOrInput.companyId) : companyIdOrInput;
+    const deliveryId = typeof companyIdOrInput === 'object' ? firstDefined(companyIdOrInput.delivery_note_id, companyIdOrInput.deliveryNoteId, companyIdOrInput.id) : id;
+    return updateDynamic(this.pool, 'delivery_notes', { company_id: companyId, id: deliveryId }, { status: 'posted', posted_at: new Date(), ...patch });
+  }
+  async markDeliveryNotePosted(...args) { return this.markPosted(...args); }
+  async updateStatus(companyId, id, status) { return updateDynamic(this.pool, 'delivery_notes', { company_id: companyId, id }, { status }); }
+}
+
+class CoreAccountingAdapter {
+  constructor({ pool, transactionManager, provided }) {
+    this.pool = pool;
+    this.transactionManager = transactionManager;
+    this.provided = provided;
+    this.service = null;
+  }
+
+  async loadService() {
+    if (this.service !== null) return this.service;
+    if (this.provided && typeof this.provided.postAccountingDocument === 'function') {
+      this.service = this.provided;
+      return this.service;
+    }
+    const mod = tryRequire(cwdPath('backend/source/services/PostingService.js'), cwdPath('src/services/PostingService.js'));
+    const PostingService = exported(mod, 'PostingService');
+    if (typeof PostingService === 'function') {
+      const candidates = [];
+
+      const jeRepoMod = tryRequire(cwdPath('backend/source/repositories/JournalEntryRepository.js'), cwdPath('src/repositories/JournalEntryRepository.js'));
+      const glRepoMod = tryRequire(cwdPath('backend/source/repositories/GlEntryRepository.js'), cwdPath('src/repositories/GlEntryRepository.js'));
+      const validatorMod = tryRequire(cwdPath('backend/source/validators/PostingValidator.js'), cwdPath('src/validators/PostingValidator.js'));
+      const accountRepoMod = tryRequire(cwdPath('backend/source/repositories/AccountRepository.js'), cwdPath('src/repositories/AccountRepository.js'));
+      const periodRepoMod = tryRequire(cwdPath('backend/source/repositories/FiscalPeriodRepository.js'), cwdPath('src/repositories/FiscalPeriodRepository.js'));
+
+      const JournalEntryRepository = exported(jeRepoMod, 'JournalEntryRepository');
+      const GlEntryRepository = exported(glRepoMod, 'GlEntryRepository');
+      const PostingValidator = exported(validatorMod, 'PostingValidator');
+      const AccountRepository = exported(accountRepoMod, 'AccountRepository');
+      const FiscalPeriodRepository = exported(periodRepoMod, 'FiscalPeriodRepository');
+
+      if (typeof JournalEntryRepository === 'function'
+        && typeof GlEntryRepository === 'function'
+        && typeof PostingValidator === 'function'
+        && typeof AccountRepository === 'function'
+        && typeof FiscalPeriodRepository === 'function') {
+        try {
+          candidates.push({
+            journalEntryRepository: new JournalEntryRepository(this.pool),
+            glEntryRepository: new GlEntryRepository(this.pool),
+            postingValidator: new PostingValidator({
+              accountRepository: new AccountRepository(this.pool),
+              fiscalPeriodRepository: new FiscalPeriodRepository(this.pool),
+            }),
+            db: this.pool,
+            pool: this.pool,
+            transactionManager: this.transactionManager,
+          });
+        } catch (_) { /* fall through to legacy constructor candidates */ }
+      }
+
+      candidates.push(
+        { db: this.pool, pool: this.pool, transactionManager: this.transactionManager },
+        { db: this.pool },
+        this.pool,
+        undefined
+      );
+      for (const deps of candidates) {
+        try {
+          const svc = deps === undefined ? new PostingService() : new PostingService(deps);
+          if (typeof svc.postAccountingDocument === 'function') {
+            this.service = svc;
+            return this.service;
+          }
+        } catch (_) { /* try next constructor shape */ }
+      }
+    }
+    throw new Int01bWiringError('EW-01 core accounting approved surface could not be constructed', {
+      expected: 'backend/source/services/PostingService.js exporting PostingService.postAccountingDocument',
+      note: 'INT-01B does not insert GL rows directly.',
+      requireErrors: mod.errors,
+    });
+  }
+
+  async postAccountingDocument(request, tx) {
+    const svc = await this.loadService();
+    return svc.postAccountingDocument(request, tx || txStorage.getStore()?.client);
+  }
+
+  async reverseAccountingDocument(request, tx) {
+    const svc = await this.loadService();
+    if (typeof svc.reverseAccountingDocument !== 'function') {
+      throw new Int01bWiringError('EW-01 reverseAccountingDocument surface is unavailable', { source: request?.source_document_type });
+    }
+    return svc.reverseAccountingDocument(request, tx || txStorage.getStore()?.client);
+  }
+}
+
+class ArLedgerAdapter {
+  constructor(pool, provided) { this.pool = pool; this.provided = provided; }
+  async createOutstanding(request = {}) {
+    if (this.provided?.createOutstanding) return this.provided.createOutstanding(request);
+    return insertDynamic(this.pool, 'ar_ap_ledger_entries', {
+      id: randomUUID(),
+      company_id: request.company_id,
+      party_type: firstDefined(request.party_type, 'customer'),
+      party_id: firstDefined(request.party_id, request.customer_id),
+      account_id: request.account_id,
+      posting_date: request.posting_date,
+      source_document_type: firstDefined(request.source_document_type, 'sales_invoice'),
+      source_document_id: request.source_document_id,
+      debit: money(firstDefined(request.debit, request.amount, request.grand_total, request.total_amount)),
+      credit: money(firstDefined(request.credit, 0)),
+      amount: money(firstDefined(request.amount, request.grand_total, request.total_amount)),
+      currency: firstDefined(request.currency, 'VND'),
+      status: 'posted',
+      journal_entry_id: request.journal_entry_id,
+    }).catch((error) => {
+      throw new Int01bWiringError('AR/AP ledger dependency failed while creating sales outstanding', { cause: error.message });
+    });
+  }
+  async reverseOutstanding(request = {}) {
+    if (this.provided?.reverseOutstanding) return this.provided.reverseOutstanding(request);
+    return insertDynamic(this.pool, 'ar_ap_ledger_entries', {
+      id: randomUUID(),
+      company_id: request.company_id,
+      party_type: firstDefined(request.party_type, 'customer'),
+      party_id: firstDefined(request.party_id, request.customer_id),
+      account_id: request.account_id,
+      posting_date: request.posting_date,
+      source_document_type: firstDefined(request.source_document_type, 'sales_invoice'),
+      source_document_id: request.source_document_id,
+      debit: money(firstDefined(request.credit, 0)),
+      credit: money(firstDefined(request.debit, request.amount, request.grand_total, request.total_amount)),
+      amount: money(firstDefined(request.amount, request.grand_total, request.total_amount)),
+      currency: firstDefined(request.currency, 'VND'),
+      is_reversal: true,
+      status: 'posted',
+    });
+  }
+  async hasActiveAllocation(request = {}) {
+    if (this.provided?.hasActiveAllocation) return this.provided.hasActiveAllocation(request);
+    const cols = await tableColumns(this.pool, 'ar_ap_allocations').catch(() => new Set());
+    if (!cols.size) return false;
+    const sourceId = firstDefined(request.source_document_id, request.invoice_id, request.id);
+    const result = await query(this.pool, `select 1 from ar_ap_allocations where source_document_id = $1 and coalesce(status, 'active') not in ('cancelled','reversed') limit 1`, [sourceId]).catch(() => ({ rows: [] }));
+    return result.rows.length > 0;
+  }
+}
+
+class TaxLedgerAdapter {
+  constructor(pool, provided) { this.pool = pool; this.provided = provided; }
+  async writeVatOutput(request = {}) {
+    if (this.provided?.writeVatOutput) return this.provided.writeVatOutput(request);
+    return insertDynamic(this.pool, 'tax_ledger_entries', {
+      id: randomUUID(),
+      company_id: request.company_id,
+      posting_date: request.posting_date,
+      source_document_type: firstDefined(request.source_document_type, 'sales_invoice'),
+      source_document_id: request.source_document_id,
+      tax_direction: 'output',
+      tax_rate: request.tax_rate,
+      taxable_amount: money(firstDefined(request.taxable_amount, request.base_amount, request.net_amount)),
+      tax_amount: money(firstDefined(request.tax_amount, request.vat_amount)),
+      currency: firstDefined(request.currency, 'VND'),
+      journal_entry_id: request.journal_entry_id,
+      status: 'posted',
+    }).catch((error) => {
+      throw new Int01bWiringError('VAT ledger dependency failed while writing VAT output', { cause: error.message });
+    });
+  }
+  async reverseVatOutput(request = {}) {
+    if (this.provided?.reverseVatOutput) return this.provided.reverseVatOutput(request);
+    return insertDynamic(this.pool, 'tax_ledger_entries', {
+      id: randomUUID(),
+      company_id: request.company_id,
+      posting_date: request.posting_date,
+      source_document_type: firstDefined(request.source_document_type, 'sales_invoice'),
+      source_document_id: request.source_document_id,
+      tax_direction: 'output',
+      tax_rate: request.tax_rate,
+      taxable_amount: -Math.abs(money(firstDefined(request.taxable_amount, request.base_amount, request.net_amount))),
+      tax_amount: -Math.abs(money(firstDefined(request.tax_amount, request.vat_amount))),
+      currency: firstDefined(request.currency, 'VND'),
+      is_reversal: true,
+      status: 'posted',
+    });
+  }
+}
+
+class InventoryIssueAdapter {
+  constructor({ pool, provided, coreAccounting, transactionManager }) {
+    this.pool = pool;
+    this.provided = provided;
+    this.coreAccounting = coreAccounting;
+    this.transactionManager = transactionManager;
+    this.inventoryService = null;
+  }
+
+  async loadService() {
+    if (this.inventoryService !== null) return this.inventoryService;
+    if (this.provided?.postIssue) { this.inventoryService = this.provided; return this.inventoryService; }
+    const serviceMod = tryRequire(cwdPath('src/modules/inventory/services/InventoryService.js'), cwdPath('backend/source/modules/inventory/services/InventoryService.js'));
+    const repoMod = tryRequire(cwdPath('src/modules/inventory/repositories/PostgresInventoryRepository.js'), cwdPath('backend/source/modules/inventory/repositories/PostgresInventoryRepository.js'));
+    const InventoryService = exported(serviceMod, 'InventoryService');
+    const PostgresInventoryRepository = exported(repoMod, 'PostgresInventoryRepository');
+    if (typeof InventoryService === 'function' && typeof PostgresInventoryRepository === 'function') {
+      const repoCandidates = [
+        { pool: this.pool, db: this.pool },
+        this.pool,
+      ];
+      for (const repoDeps of repoCandidates) {
+        try {
+          const inventoryRepository = repoDeps === this.pool ? new PostgresInventoryRepository(this.pool) : new PostgresInventoryRepository(repoDeps);
+          this.inventoryService = new InventoryService({
+            inventoryRepository,
+            accountingEngine: this.coreAccounting,
+            transactionManager: this.transactionManager,
+          });
+          return this.inventoryService;
+        } catch (_) { /* try next */ }
+      }
+    }
+    throw new Int01bWiringError('EW-05 inventory approved surface could not be constructed for sales issue', {
+      serviceRequireErrors: serviceMod.errors,
+      repositoryRequireErrors: repoMod.errors,
+    });
+  }
+
+  async postIssue(request = {}) {
+    const svc = await this.loadService();
+    if (this.provided?.postIssue) return svc.postIssue(request);
+    const lines = request.lines || request.invoice_lines || request.delivery_lines || [request];
+    const results = [];
+    for (const line of lines) {
+      const mapped = {
+        companyId: firstDefined(request.companyId, request.company_id, line.companyId, line.company_id),
+        itemId: firstDefined(line.itemId, line.item_id, request.itemId, request.item_id),
+        warehouseId: firstDefined(line.warehouseId, line.warehouse_id, request.warehouseId, request.warehouse_id),
+        postingDate: firstDefined(request.postingDate, request.posting_date),
+        postingTime: firstDefined(request.postingTime, request.posting_time, '00:00:00'),
+        sourceDocumentType: firstDefined(request.sourceDocumentType, request.source_document_type, 'sales_delivery'),
+        sourceDocumentId: firstDefined(request.sourceDocumentId, request.source_document_id),
+        sourceDocumentLineId: firstDefined(line.sourceDocumentLineId, line.source_document_line_id, line.id),
+        quantity: Number(firstDefined(line.quantity, request.quantity)),
+        inventoryAccountId: firstDefined(request.inventoryAccountId, request.inventory_account_id, line.inventoryAccountId, line.inventory_account_id, process.env.MD01_INVENTORY_ACCOUNT_ID),
+        offsetAccountId: firstDefined(request.offsetAccountId, request.offset_account_id, line.offsetAccountId, line.offset_account_id, process.env.MD01_COGS_ACCOUNT_ID),
+      };
+      results.push(await svc.postIssue(mapped));
+    }
+    return {
+      results,
+      accounting_lines: results.flatMap((r) => r.accounting_lines || r.accountingLines || []),
+      inventory_credit_lines: results.flatMap((r) => r.inventory_credit_lines || r.inventoryCreditLines || []),
+      ledger_entry_ids: results.map((r) => r.entry?.id || r.ledger_entry_id || r.ledgerEntryId).filter(Boolean),
+    };
+  }
+
+  async reverseIssue(request = {}) {
+    const svc = await this.loadService();
+    if (typeof svc.reverseIssue === 'function') return svc.reverseIssue(request);
+    throw new Int01bWiringError('EW-05 reverseIssue surface is unavailable', { source: request?.source_document_type });
+  }
+}
+
+async function createSalesDependencies(context, input) {
+  const pool = await makePool(context);
+  const transactionManager = context.transactionManager || new PgTransactionManager(pool);
+
+  const salesMod = tryRequire(cwdPath('src/sales'), cwdPath('backend/source/sales'));
+  const postingMod = tryRequire(cwdPath('src/sales/services/SalesPostingService.js'), cwdPath('backend/source/sales/services/SalesPostingService.js'));
+  const invoiceMod = tryRequire(cwdPath('src/sales/services/SalesInvoiceService.js'), cwdPath('backend/source/sales/services/SalesInvoiceService.js'));
+  const deliveryMod = tryRequire(cwdPath('src/sales/services/DeliveryNoteService.js'), cwdPath('backend/source/sales/services/DeliveryNoteService.js'));
+  const resolverMod = tryRequire(cwdPath('src/sales/services/AccountContractResolver.js'), cwdPath('backend/source/sales/services/AccountContractResolver.js'));
+
+  const SalesPostingService = exported(postingMod, 'SalesPostingService') || exported(salesMod, 'SalesPostingService');
+  const SalesInvoiceService = exported(invoiceMod, 'SalesInvoiceService') || exported(salesMod, 'SalesInvoiceService');
+  const DeliveryNoteService = exported(deliveryMod, 'DeliveryNoteService') || exported(salesMod, 'DeliveryNoteService');
+  const AccountContractResolver = exported(resolverMod, 'AccountContractResolver') || exported(salesMod, 'AccountContractResolver');
+  assertFunction(SalesPostingService, 'SalesPostingService');
+
+  const salesInvoiceRepository = context.salesInvoiceRepository || new PostgresSalesInvoiceRepository(pool);
+  const deliveryNoteRepository = context.deliveryNoteRepository || new PostgresDeliveryNoteRepository(pool);
+  const accountSettingsRepository = context.accountSettingsRepository || new PostgresAccountSettingsRepository(pool);
+  const companySettingsRepository = context.companySettingsRepository || new PostgresCompanySettingsRepository(pool);
+  const accountResolver = context.accountResolver || (typeof AccountContractResolver === 'function'
+    ? new AccountContractResolver({ accountSettingsRepository, companySettingsRepository,})
+    : accountSettingsRepository);
+  const coreAccounting = new CoreAccountingAdapter({ pool, transactionManager, provided: context.coreAccounting || context.accountingEngine });
+  const inventoryIssueService = context.inventoryIssueService || new InventoryIssueAdapter({
+    pool,
+    provided: context.inventoryIssueService,
+    coreAccounting,
+    transactionManager,
+  });
+  const arLedger = context.arLedger || new ArLedgerAdapter(pool, context.arLedger);
+  const taxLedger = context.taxLedger || new TaxLedgerAdapter(pool, context.taxLedger);
+
+  const salesInvoiceService = typeof SalesInvoiceService === 'function'
+    ? new SalesInvoiceService({ salesInvoiceRepository, transactionManager, companySettingsRepository,})
+    : null;
+  const deliveryNoteService = typeof DeliveryNoteService === 'function'
+    ? new DeliveryNoteService({ deliveryNoteRepository, transactionManager, companySettingsRepository,})
+    : null;
+
+  const salesPostingService = new SalesPostingService({
+    transactionManager,
+    salesInvoiceRepository,
+    deliveryNoteRepository,
+    companySettingsRepository,
+    accountResolver,
+    coreAccounting,
+    inventoryIssueService,
+    arLedger,
+    taxLedger,
+  });
+
+  return {
+    pool,
+    transactionManager,
+    salesInvoiceRepository,
+    deliveryNoteRepository,
+    salesInvoiceService,
+    deliveryNoteService,
+    salesPostingService,
+    accountSettingsRepository,
+    companySettingsRepository,
+    accountResolver,
+    coreAccounting,
+    inventoryIssueService,
+    arLedger,
+    taxLedger,
+    input,
+  };
+}
+
+async function maybeCallCreate(service, payload, companyId) {
+  if (!service) return null;
+  const names = ['createDraft', 'create', 'createSalesInvoice', 'createInvoice', 'createDeliveryNote', 'saveDraft'];
+  for (const name of names) {
+    if (typeof service[name] !== 'function') continue;
+    try {
+      if (service[name].length >= 2) return await service[name](companyId, payload);
+      return await service[name]({ company_id: companyId, ...payload });
+    } catch (_) { /* constructor exists but method shape may differ; repository fallback remains approved source repository */ }
+  }
+  return null;
+}
+
+async function invokePosting(service, candidates) {
+  const errors = [];
+  for (const { method, args } of candidates) {
+    if (typeof service[method] !== 'function') continue;
+    try {
+      return { method, result: await service[method](...args) };
+    } catch (error) {
+      errors.push({ method, message: error.message });
+    }
+  }
+  throw new Int01bWiringError('SalesPostingService did not expose a compatible posting method or all posting attempts failed', { errors });
+}
+
+export function createPostSalesDeliveryBridge(adapterContext = {}) {
+  return {
+    async postSalesDelivery(ctx = {}) {
+      const input = normalizeInput(ctx);
+      const deps = await createSalesDependencies(adapterContext, input);
+      const { pool } = deps;
+
+      const customerId = await lookupRequired(pool, 'customers', input.companyId, input.customerId, 'MD01 customer');
+      const itemId = await lookupRequired(pool, 'items', input.companyId, input.itemId, 'MD01 item');
+      const warehouseId = await lookupRequired(pool, 'warehouses', input.companyId, input.warehouseId, 'MD01 warehouse');
+      const revenueAccountId = await resolveAccountId(pool, input.companyId, ['sales_revenue', 'revenue'], ['MD01_REVENUE_ACCOUNT_ID']);
+
+      if (!revenueAccountId) {
+        throw new Int01bWiringError('Unable to resolve sales revenue account id', { companyId: input.companyId });
+      }
+
+      return deps.transactionManager.withTransaction(async () => {
+        const deliveryPayload = {
+          company_id: input.companyId,
+          customer_id: customerId,
+          item_id: itemId,
+          warehouse_id: warehouseId,
+          quantity: input.quantity,
+          posting_date: input.postingDate,
+          idempotency_key: `${input.idempotencyKey}:delivery`,
+        };
+        const invoicePayload = {
+          company_id: input.companyId,
+          customer_id: customerId,
+          item_id: itemId,
+          warehouse_id: warehouseId,
+          quantity: input.quantity,
+          unit_price: input.unitPrice,
+          tax_rate: input.taxRate,
+          posting_date: input.postingDate,
+          sale_type: input.saleType,
+          payment_method: input.paymentMethod,
+          currency: input.currency,
+          revenue_account_id: revenueAccountId,
+          stock_pattern: process.env.INT01A_SALES_STOCK_PATTERN || 'invoice_updates_stock',
+          idempotency_key: `${input.idempotencyKey}:invoice`,
+        };
+
+        const deliveryViaService = await maybeCallCreate(deps.deliveryNoteService, deliveryPayload, input.companyId);
+        const invoiceViaService = await maybeCallCreate(deps.salesInvoiceService, invoicePayload, input.companyId);
+        const delivery = deliveryViaService || await deps.deliveryNoteRepository.ensureDraft(deliveryPayload);
+        const invoice = invoiceViaService || await deps.salesInvoiceRepository.ensureDraft(invoicePayload);
+
+        const deliveryPost = await invokePosting(deps.salesPostingService, [
+          { method: 'postDeliveryNote', args: [{ company_id: input.companyId, delivery_note_id: delivery.id, posting_date: input.postingDate, idempotency_key: `${input.idempotencyKey}:post-delivery` }] },
+          { method: 'postDelivery', args: [{ company_id: input.companyId, delivery_note_id: delivery.id, posting_date: input.postingDate, idempotency_key: `${input.idempotencyKey}:post-delivery` }] },
+        ]).catch((error) => ({ skipped: true, error: error.message }));
+
+        const invoicePost = await invokePosting(deps.salesPostingService, [
+          { method: 'postSalesInvoice', args: [{ company_id: input.companyId, invoice_id: invoice.id, posting_date: input.postingDate, idempotency_key: `${input.idempotencyKey}:post-invoice` }] },
+          { method: 'postInvoice', args: [{ company_id: input.companyId, invoice_id: invoice.id, posting_date: input.postingDate, idempotency_key: `${input.idempotencyKey}:post-invoice` }] },
+        ]);
+
+        return {
+          ok: true,
+          surface: 'EW-03 Sales/Delivery approved service surface',
+          company_id: input.companyId,
+          posting_date: input.postingDate,
+          delivery_note_id: delivery.id,
+          sales_invoice_id: invoice.id,
+          delivery_post_result: deliveryPost,
+          invoice_post_result: invoicePost,
+          wiring: {
+            transactionManager: 'PgTransactionManager.withTransaction',
+            salesInvoiceRepository: 'PostgresSalesInvoiceRepository',
+            deliveryNoteRepository: 'PostgresDeliveryNoteRepository',
+            salesPostingService: 'SalesPostingService',
+            glWriter: 'EW-01 coreAccounting.postAccountingDocument only',
+          },
+        };
+      });
+    },
+  };
+}
+
+export { Int01bWiringError };

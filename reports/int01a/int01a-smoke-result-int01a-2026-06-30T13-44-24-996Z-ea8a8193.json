@@ -1,0 +1,62 @@
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-06-30T13-44-24-996Z-ea8a8193",
+  "status": "FAIL",
+  "startedAt": "2026-06-30T13:44:24.997Z",
+  "endedAt": "2026-06-30T13:44:24.998Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "databaseUrlRedacted": "postgresql://postgres:***@127.0.0.1:15432/local_final_gate?sslmode=disable"
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "FAIL",
+      "startedAt": "2026-06-30T13:44:24.997Z",
+      "endedAt": "2026-06-30T13:44:24.997Z",
+      "durationMs": 0,
+      "evidence": null,
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Missing required environment variables",
+        "details": {
+          "missing": [
+            "NODE_ENV"
+          ],
+          "reproduction": "Export the variables listed in EXPECTED_ENVIRONMENT_VARIABLES.md and rerun npm run int01a:smoke."
+        }
+      }
+    }
+  ],
+  "openIssues": [
+    {
+      "step": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "error": {
+        "name": "SmokeFailure",
+        "message": "Missing required environment variables",
+        "details": {
+          "missing": [
+            "NODE_ENV"
+          ],
+          "reproduction": "Export the variables listed in EXPECTED_ENVIRONMENT_VARIABLES.md and rerun npm run int01a:smoke."
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "db": null,
+    "migrationInfo": null
+  },
+  "terminalError": {
+    "name": "SmokeFailure",
+    "message": "Missing required environment variables",
+    "details": {
+      "missing": [
+        "NODE_ENV"
+      ],
+      "reproduction": "Export the variables listed in EXPECTED_ENVIRONMENT_VARIABLES.md and rerun npm run int01a:smoke."
+    }
+  }
+}

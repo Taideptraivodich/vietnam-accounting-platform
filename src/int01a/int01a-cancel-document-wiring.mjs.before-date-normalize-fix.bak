@@ -1,0 +1,153 @@
+import { createRequire } from 'node:module';
+import { randomUUID } from 'node:crypto';
+
+const require = createRequire(import.meta.url);
+const { Pool } = require('pg');
+
+function firstDefined(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== '') return value;
+  }
+  return undefined;
+}
+
+function isoDate(value) {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  return String(value).slice(0, 10);
+}
+
+function money(value) {
+  const n = Number(value ?? 0);
+  return Number.isFinite(n) ? Math.round(n * 100) / 100 : 0;
+}
+
+function exported(mod, name) {
+  return mod?.[name] || mod?.default || mod;
+}
+
+function createPostingService(pool) {
+  const PostingService = exported(require('../services/PostingService.js'), 'PostingService');
+  const JournalEntryRepository = exported(require('../repositories/JournalEntryRepository.js'), 'JournalEntryRepository');
+  const GlEntryRepository = exported(require('../repositories/GlEntryRepository.js'), 'GlEntryRepository');
+  const PostingValidator = exported(require('../validators/PostingValidator.js'), 'PostingValidator');
+  const AccountRepository = exported(require('../repositories/AccountRepository.js'), 'AccountRepository');
+  const FiscalPeriodRepository = exported(require('../repositories/FiscalPeriodRepository.js'), 'FiscalPeriodRepository');
+
+  return new PostingService({
+    journalEntryRepository: new JournalEntryRepository(pool),
+    glEntryRepository: new GlEntryRepository(pool),
+    postingValidator: new PostingValidator({
+      accountRepository: new AccountRepository(pool),
+      fiscalPeriodRepository: new FiscalPeriodRepository(pool),
+    }),
+    db: pool,
+  });
+}
+
+async function postAccounting(pool, request) {
+  const svc = createPostingService(pool);
+  const client = await pool.connect();
+  try {
+    await client.query('begin');
+    const result = await svc.postAccountingDocument(request, client);
+    await client.query('commit');
+    return result;
+  } catch (error) {
+    await client.query('rollback').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+function documentIdsFromTarget(input = {}) {
+  const ids = [
+    ...(Array.isArray(input.target?.accountingDocumentIds) ? input.target.accountingDocumentIds : []),
+    ...(Array.isArray(input.accountingDocumentIds) ? input.accountingDocumentIds : []),
+    input.target?.accountingDocumentId,
+    input.accountingDocumentId,
+    input.target?.result?.accountingDocumentId,
+    ...(Array.isArray(input.target?.result?.accountingDocumentIds) ? input.target.result.accountingDocumentIds : []),
+  ].filter(Boolean).map(String);
+
+  return [...new Set(ids)];
+}
+
+export async function cancelDocument(input = {}) {
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+  try {
+    const companyId = firstDefined(input.companyId, input.company_id, process.env.MD01_COMPANY_ID);
+    if (!companyId) throw new Error('INT01A cancelDocument missing companyId');
+
+    const originalDocIds = documentIdsFromTarget(input);
+    if (!originalDocIds.length) throw new Error('INT01A cancelDocument missing original accounting document id');
+
+    const originalDocId = originalDocIds[0];
+    const originalRowsResult = await pool.query(
+      `select *
+         from gl_entries
+        where company_id = $1
+          and journal_entry_id::text = $2
+        order by created_at, id`,
+      [companyId, originalDocId]
+    );
+
+    const originalRows = originalRowsResult.rows;
+    if (!originalRows.length) {
+      throw new Error(`INT01A cancelDocument found no GL rows for original document ${originalDocId}`);
+    }
+
+    const postingDate = isoDate(firstDefined(input.postingDate, input.posting_date, originalRows[0]?.posting_date));
+    const reversalSourceDocumentId = randomUUID();
+    const baseKey = `int01a-cancel-${Date.now()}-${randomUUID()}`;
+
+    const lines = originalRows.map((row, index) => ({
+      account_id: row.account_id,
+      debit_amount: money(row.credit_amount),
+      credit_amount: money(row.debit_amount),
+      description: `INT-01A reversal line ${index + 1}`,
+      party_type: row.party_type,
+      party_id: row.party_id,
+      warehouse_id: row.warehouse_id,
+      inventory_item_id: row.inventory_item_id,
+      inventory_ledger_entry_id: row.inventory_ledger_entry_id,
+      source_document_line_id: row.source_document_line_id,
+    }));
+
+    const accounting = await postAccounting(pool, {
+      company_id: companyId,
+      posting_date: postingDate,
+      source_document_type: 'reversal',
+      source_document_id: reversalSourceDocumentId,
+      source_document_no: `INT01A-REV-${Date.now()}`,
+      currency: firstDefined(originalRows[0]?.currency, 'VND'),
+      idempotency_key: `${baseKey}:post-reversal`,
+      reversal_of_id: originalDocId,
+      description: `INT-01A append-only reversal for ${originalDocId}`,
+      lines,
+    });
+
+    const reversalAccountingDocumentId = firstDefined(accounting?.journal_entry_id, accounting?.id);
+
+    return {
+      ok: true,
+      surface: 'Cancel/Reversal approved surface',
+      company_id: companyId,
+      posting_date: postingDate,
+      accountingDocumentId: reversalAccountingDocumentId,
+      accountingDocumentIds: reversalAccountingDocumentId ? [reversalAccountingDocumentId] : [],
+      reversalAccountingDocumentId,
+      reversalOfAccountingDocumentId: originalDocId,
+      documentId: reversalAccountingDocumentId,
+      reversal_post_result: accounting,
+      originalAccountingDocumentIds: originalDocIds,
+      wiring: {
+        glWriter: 'EW-01 PostingService.postAccountingDocument only',
+        behavior: 'append-only reversal; original GL rows are not updated or deleted',
+      },
+    };
+  } finally {
+    await pool.end().catch(() => {});
+  }
+}

@@ -1,0 +1,19 @@
+--- a/local-runbook.sh
++++ b/local-runbook.sh
+@@
+-psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
++psql -d "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+@@
+-while read -r migration; do
++while IFS= read -r migration || [ -n "$migration" ]; do
++  migration="${migration%$'\r'}"
++  migration="$(printf '%s' "$migration" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
++  [ -z "$migration" ] && continue
++  [ "${migration#\#}" != "$migration" ] && continue
+   test -f "$migration" || exit 1
+-  psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
++  psql -d "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+ done < migrations/MIGRATION_ORDER.txt
+@@
++export INT01A_TABLE_AR_LEDGER="${INT01A_TABLE_AR_LEDGER:-ar_ap_ledger_entries}"
++export INT01A_TABLE_AP_LEDGER="${INT01A_TABLE_AP_LEDGER:-ar_ap_ledger_entries}"

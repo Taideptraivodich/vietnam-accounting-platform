@@ -1,0 +1,224 @@
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-07-01T12-05-43-309Z-827e2ea9",
+  "status": "FAIL",
+  "startedAt": "2026-07-01T12:05:43.310Z",
+  "endedAt": "2026-07-01T12:05:44.221Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "nodeEnv": "integration",
+    "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "PASS",
+      "startedAt": "2026-07-01T12:05:43.310Z",
+      "endedAt": "2026-07-01T12:05:43.311Z",
+      "durationMs": 1,
+      "evidence": {
+        "requiredEnv": [
+          "DATABASE_URL",
+          "NODE_ENV",
+          "MD01_COMPANY_ID",
+          "MD01_INVENTORY_ACCOUNT_ID",
+          "MD01_COGS_ACCOUNT_ID",
+          "MD01_REVENUE_ACCOUNT_ID",
+          "MD01_EXPENSE_ACCOUNT_ID"
+        ],
+        "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-01",
+      "title": "Database connectivity uses real PostgreSQL",
+      "status": "PASS",
+      "startedAt": "2026-07-01T12:05:43.311Z",
+      "endedAt": "2026-07-01T12:05:43.360Z",
+      "durationMs": 49,
+      "evidence": {
+        "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+        "database": "local_final_gate",
+        "schema": "public"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-02",
+      "title": "Migrations already applied / freeze-scope tables exist",
+      "status": "PASS",
+      "startedAt": "2026-07-01T12:05:43.360Z",
+      "endedAt": "2026-07-01T12:05:43.400Z",
+      "durationMs": 40,
+      "evidence": {
+        "migrationInfo": {
+          "migrationTable": null,
+          "rows": null,
+          "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+        },
+        "resolvedTables": {
+          "companies": "public.companies",
+          "accounts": "public.accounts",
+          "customers": "public.customers",
+          "suppliers": "public.suppliers",
+          "items": "public.items",
+          "warehouses": "public.warehouses",
+          "accountingDocuments": "public.journal_entries",
+          "glEntries": "public.gl_entries",
+          "vatLedger": "public.tax_ledger_entries",
+          "arLedger": "public.ar_ap_ledger_entries",
+          "apLedger": "public.ar_ap_ledger_entries",
+          "inventoryLedger": "public.inventory_ledger_entries",
+          "stockBalances": "public.stock_balances",
+          "salesInvoices": "public.sales_invoices",
+          "purchaseReceipts": "public.purchase_receipts",
+          "purchaseInvoices": "public.purchase_invoices",
+          "migrations": null,
+          "arapAllocations": "public.ar_ap_allocations",
+          "deliveries": "public.delivery_notes"
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-03",
+      "title": "MD-01 seed/preseed real master data exists",
+      "status": "PASS",
+      "startedAt": "2026-07-01T12:05:43.400Z",
+      "endedAt": "2026-07-01T12:05:43.439Z",
+      "durationMs": 39,
+      "evidence": {
+        "companyId": "b9acc1ea-84e2-4a10-b2a4-07928be4a4a1",
+        "companyExists": true,
+        "masterData": {
+          "customers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "suppliers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "items": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "warehouses": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          }
+        },
+        "accountChecks": {
+          "inventory": {
+            "id": "8346be95-19be-4dd5-96a4-40261768f615",
+            "exists": true
+          },
+          "cogs": {
+            "id": "74dfc15d-5ea0-47e2-b890-5a63f9c34246",
+            "exists": true
+          },
+          "revenue": {
+            "id": "835c54db-b3c2-4b7c-9b4c-f9878d5184a9",
+            "exists": true
+          },
+          "expense": {
+            "id": "a567baf3-0bb8-4df5-9c63-76e525d30d06",
+            "exists": true
+          },
+          "grni": {
+            "id": "1325092e-b9f8-42f7-be31-3bcfe9c2aad9",
+            "exists": true
+          }
+        },
+        "grniSubtype": {
+          "subtypeColumn": "account_subtype",
+          "goodsReceivedNotInvoicedRows": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-04",
+      "title": "Approved module surface adapter/commands are bound",
+      "status": "PASS",
+      "startedAt": "2026-07-01T12:05:43.439Z",
+      "endedAt": "2026-07-01T12:05:43.444Z",
+      "durationMs": 5,
+      "evidence": {
+        "mode": "module",
+        "adapterPath": "./src/int01a/int01a-approved-surface-adapter-int01c.mjs",
+        "commandMode": false
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-05",
+      "title": "Post Sales / Delivery baseline through approved surface",
+      "status": "FAIL",
+      "startedAt": "2026-07-01T12:05:43.506Z",
+      "endedAt": "2026-07-01T12:05:44.220Z",
+      "durationMs": 714,
+      "evidence": null,
+      "error": {
+        "name": "Int01bWiringError",
+        "message": "[INT01B] SalesPostingService did not expose a compatible posting method or all posting attempts failed",
+        "details": {
+          "errors": [
+            {
+              "method": "postSalesInvoice",
+              "message": "this.accountSettingsRepository.findBySubtype is not a function"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "openIssues": [
+    {
+      "step": "INT01A-05",
+      "title": "Post Sales / Delivery baseline through approved surface",
+      "error": {
+        "name": "Int01bWiringError",
+        "message": "[INT01B] SalesPostingService did not expose a compatible posting method or all posting attempts failed",
+        "details": {
+          "errors": [
+            {
+              "method": "postSalesInvoice",
+              "message": "this.accountSettingsRepository.findBySubtype is not a function"
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "runtime": {
+    "db": {
+      "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+      "database": "local_final_gate",
+      "schema": "public"
+    },
+    "migrationInfo": {
+      "migrationTable": null,
+      "rows": null,
+      "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+    }
+  },
+  "terminalError": {
+    "name": "Int01bWiringError",
+    "message": "[INT01B] SalesPostingService did not expose a compatible posting method or all posting attempts failed",
+    "details": {
+      "errors": [
+        {
+          "method": "postSalesInvoice",
+          "message": "this.accountSettingsRepository.findBySubtype is not a function"
+        }
+      ]
+    }
+  }
+}

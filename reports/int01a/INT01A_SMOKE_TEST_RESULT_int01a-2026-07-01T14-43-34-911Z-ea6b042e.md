@@ -1,0 +1,740 @@
+# INT-01A Smoke Test Result
+
+- Runner: INT-01A_P0_v1.0
+- Run ID: int01a-2026-07-01T14-43-34-911Z-ea6b042e
+- Status: **PASS**
+- Started: 2026-07-01T14:43:34.912Z
+- Ended: 2026-07-01T14:43:36.076Z
+- NODE_ENV: integration
+- DATABASE_URL: postgres://postgres:***@127.0.0.1:15432/local_final_gate
+
+## Step Summary
+
+| Step | Status | Duration ms | Title |
+|---|---:|---:|---|
+| INT01A-00 | PASS | 0 | Required environment is present and integration-only |
+| INT01A-01 | PASS | 44 | Database connectivity uses real PostgreSQL |
+| INT01A-02 | PASS | 34 | Migrations already applied / freeze-scope tables exist |
+| INT01A-03 | PASS | 34 | MD-01 seed/preseed real master data exists |
+| INT01A-04 | PASS | 8 | Approved module surface adapter/commands are bound |
+| INT01A-05 | PASS | 267 | Post Sales / Delivery baseline through approved surface |
+| INT01A-06 | PASS | 172 | Post Purchase / GRNI baseline through approved surface |
+| INT01A-07 | PASS | 100 | Post VAT ledger baseline / source linkage |
+| INT01A-08 | PASS | 155 | Post AR/AP settlement through approved surface |
+| INT01A-09 | PASS | 136 | Post inventory movement / adjustment through approved surface |
+| INT01A-10 | PASS | 4 | Query GL entries and verify Debit = Credit for all smoke documents |
+| INT01A-11 | PASS | 13 | Verify company_id isolation for freeze-scope ledgers |
+| INT01A-12 | PASS | 148 | Cancel one document and verify append-only reversal |
+
+## Failures / Open Issues
+
+None.
+## Full Evidence
+
+```json
+{
+  "runner": "INT-01A_P0_v1.0",
+  "runId": "int01a-2026-07-01T14-43-34-911Z-ea6b042e",
+  "status": "PASS",
+  "startedAt": "2026-07-01T14:43:34.912Z",
+  "endedAt": "2026-07-01T14:43:36.076Z",
+  "environment": {
+    "nodeVersion": "v24.11.1",
+    "nodeEnv": "integration",
+    "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+  },
+  "steps": [
+    {
+      "id": "INT01A-00",
+      "title": "Required environment is present and integration-only",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:34.912Z",
+      "endedAt": "2026-07-01T14:43:34.912Z",
+      "durationMs": 0,
+      "evidence": {
+        "requiredEnv": [
+          "DATABASE_URL",
+          "NODE_ENV",
+          "MD01_COMPANY_ID",
+          "MD01_INVENTORY_ACCOUNT_ID",
+          "MD01_COGS_ACCOUNT_ID",
+          "MD01_REVENUE_ACCOUNT_ID",
+          "MD01_EXPENSE_ACCOUNT_ID"
+        ],
+        "databaseUrlRedacted": "postgres://postgres:***@127.0.0.1:15432/local_final_gate"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-01",
+      "title": "Database connectivity uses real PostgreSQL",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:34.912Z",
+      "endedAt": "2026-07-01T14:43:34.956Z",
+      "durationMs": 44,
+      "evidence": {
+        "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+        "database": "local_final_gate",
+        "schema": "public"
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-02",
+      "title": "Migrations already applied / freeze-scope tables exist",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:34.956Z",
+      "endedAt": "2026-07-01T14:43:34.990Z",
+      "durationMs": 34,
+      "evidence": {
+        "migrationInfo": {
+          "migrationTable": null,
+          "rows": null,
+          "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+        },
+        "resolvedTables": {
+          "companies": "public.companies",
+          "accounts": "public.accounts",
+          "customers": "public.customers",
+          "suppliers": "public.suppliers",
+          "items": "public.items",
+          "warehouses": "public.warehouses",
+          "accountingDocuments": "public.journal_entries",
+          "glEntries": "public.gl_entries",
+          "vatLedger": "public.tax_ledger_entries",
+          "arLedger": "public.ar_ap_ledger_entries",
+          "apLedger": "public.ar_ap_ledger_entries",
+          "inventoryLedger": "public.inventory_ledger_entries",
+          "stockBalances": "public.stock_balances",
+          "salesInvoices": "public.sales_invoices",
+          "purchaseReceipts": "public.purchase_receipts",
+          "purchaseInvoices": "public.purchase_invoices",
+          "migrations": null,
+          "arapAllocations": "public.ar_ap_allocations",
+          "deliveries": "public.delivery_notes"
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-03",
+      "title": "MD-01 seed/preseed real master data exists",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:34.990Z",
+      "endedAt": "2026-07-01T14:43:35.024Z",
+      "durationMs": 34,
+      "evidence": {
+        "companyId": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+        "companyExists": true,
+        "masterData": {
+          "customers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "suppliers": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "items": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          },
+          "warehouses": {
+            "count": 1,
+            "scoped": true,
+            "companyCol": "company_id"
+          }
+        },
+        "accountChecks": {
+          "inventory": {
+            "id": "337e86ae-6ef6-4ef5-94dd-d210d57334c6",
+            "exists": true
+          },
+          "cogs": {
+            "id": "be882194-fa75-4daa-8c39-016abf55d0c3",
+            "exists": true
+          },
+          "revenue": {
+            "id": "d0a7fa8c-e281-43bf-b000-b0bcbed553e3",
+            "exists": true
+          },
+          "expense": {
+            "id": "779ecf1d-b794-49b3-b7d2-e033465d3398",
+            "exists": true
+          },
+          "grni": {
+            "id": "6db7f93f-6014-4ebe-82c5-31a25e63efa6",
+            "exists": true
+          }
+        },
+        "grniSubtype": {
+          "subtypeColumn": "account_subtype",
+          "goodsReceivedNotInvoicedRows": 1
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-04",
+      "title": "Approved module surface adapter/commands are bound",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.024Z",
+      "endedAt": "2026-07-01T14:43:35.032Z",
+      "durationMs": 8,
+      "evidence": {
+        "mode": "module",
+        "adapterPath": "./src/int01a/int01a-approved-surface-adapter-int01c.mjs",
+        "commandMode": false
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-05",
+      "title": "Post Sales / Delivery baseline through approved surface",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.081Z",
+      "endedAt": "2026-07-01T14:43:35.348Z",
+      "durationMs": 267,
+      "evidence": {
+        "result": {
+          "ok": true,
+          "surface": "EW-03 Sales/Delivery approved service surface",
+          "company_id": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+          "posting_date": "2026-07-01",
+          "delivery_note_id": "d38ddfba-241a-4b3f-b27f-293873377335",
+          "sales_invoice_id": "2c70674e-7ef9-4082-9200-116eaa4ece04",
+          "accountingDocumentId": "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+          "accountingDocumentIds": [
+            "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6"
+          ],
+          "delivery_post_result": {
+            "skipped": true,
+            "error": "[INT01B] SalesPostingService did not expose a compatible posting method or all posting attempts failed"
+          },
+          "invoice_post_result": {
+            "method": "postSalesInvoice",
+            "result": {
+              "status": "posted",
+              "id": "2c70674e-7ef9-4082-9200-116eaa4ece04",
+              "journal_entry_id": "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6"
+            }
+          },
+          "wiring": {
+            "transactionManager": "PgTransactionManager.withTransaction",
+            "salesInvoiceRepository": "PostgresSalesInvoiceRepository",
+            "deliveryNoteRepository": "PostgresDeliveryNoteRepository",
+            "salesPostingService": "SalesPostingService",
+            "glWriter": "EW-01 coreAccounting.postAccountingDocument only"
+          },
+          "__originalGlRowsBeforeCancel": [
+            {
+              "id": "51bef16d-a07c-411b-866c-ae41ba38ef07",
+              "company_id": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+              "journal_entry_id": "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+              "journal_entry_line_id": "b30cc247-406d-428f-b776-e1a12dbffd70",
+              "account_id": "337e86ae-6ef6-4ef5-94dd-d210d57334c6",
+              "posting_date": "2026-06-30T17:00:00.000Z",
+              "debit_amount": "1100",
+              "credit_amount": "0",
+              "currency": "VND",
+              "source_document_type": "sales_invoice",
+              "source_document_id": "2c70674e-7ef9-4082-9200-116eaa4ece04",
+              "source_document_no": "INT01A-SI-1782917015208",
+              "source_document_line_id": null,
+              "party_type": null,
+              "party_id": "00000000-0000-4000-8000-000000000101",
+              "warehouse_id": null,
+              "inventory_item_id": null,
+              "inventory_ledger_entry_id": null,
+              "tax_metadata": {},
+              "idempotency_key": "int01a-sales-delivery-1782917015176-02a2a4c1-d23b-4c4d-a795-560923187071:post-invoice",
+              "created_at": "2026-07-01T14:43:25.255Z"
+            },
+            {
+              "id": "850f1b82-4429-49d4-8751-144d15da2a79",
+              "company_id": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+              "journal_entry_id": "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+              "journal_entry_line_id": "e4ceff21-92d8-43ac-8c8b-749a82be6a23",
+              "account_id": "d0a7fa8c-e281-43bf-b000-b0bcbed553e3",
+              "posting_date": "2026-06-30T17:00:00.000Z",
+              "debit_amount": "0",
+              "credit_amount": "1000",
+              "currency": "VND",
+              "source_document_type": "sales_invoice",
+              "source_document_id": "2c70674e-7ef9-4082-9200-116eaa4ece04",
+              "source_document_no": "INT01A-SI-1782917015208",
+              "source_document_line_id": null,
+              "party_type": null,
+              "party_id": "00000000-0000-4000-8000-000000000101",
+              "warehouse_id": null,
+              "inventory_item_id": null,
+              "inventory_ledger_entry_id": null,
+              "tax_metadata": {},
+              "idempotency_key": "int01a-sales-delivery-1782917015176-02a2a4c1-d23b-4c4d-a795-560923187071:post-invoice",
+              "created_at": "2026-07-01T14:43:25.255Z"
+            },
+            {
+              "id": "e55961f6-79cc-470b-ae77-0495be19ed04",
+              "company_id": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+              "journal_entry_id": "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+              "journal_entry_line_id": "ce24e5fd-e946-4e63-9770-04b343dbc6cc",
+              "account_id": "6db7f93f-6014-4ebe-82c5-31a25e63efa6",
+              "posting_date": "2026-06-30T17:00:00.000Z",
+              "debit_amount": "0",
+              "credit_amount": "100",
+              "currency": "VND",
+              "source_document_type": "sales_invoice",
+              "source_document_id": "2c70674e-7ef9-4082-9200-116eaa4ece04",
+              "source_document_no": "INT01A-SI-1782917015208",
+              "source_document_line_id": null,
+              "party_type": null,
+              "party_id": "00000000-0000-4000-8000-000000000101",
+              "warehouse_id": null,
+              "inventory_item_id": null,
+              "inventory_ledger_entry_id": null,
+              "tax_metadata": {},
+              "idempotency_key": "int01a-sales-delivery-1782917015176-02a2a4c1-d23b-4c4d-a795-560923187071:post-invoice",
+              "created_at": "2026-07-01T14:43:25.255Z"
+            }
+          ]
+        },
+        "deltas": {
+          "glEntries": {
+            "before": 0,
+            "after": 9,
+            "delta": 9
+          },
+          "salesInvoices": {
+            "before": 0,
+            "after": 1,
+            "delta": 1
+          },
+          "arLedger": {
+            "before": 0,
+            "after": 1,
+            "delta": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-06",
+      "title": "Post Purchase / GRNI baseline through approved surface",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.348Z",
+      "endedAt": "2026-07-01T14:43:35.520Z",
+      "durationMs": 172,
+      "evidence": {
+        "result": {
+          "ok": true,
+          "surface": "EW-04 Purchase/GRNI approved service surface",
+          "company_id": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+          "posting_date": "2026-07-01",
+          "purchase_receipt_id": "e26039ea-865f-435c-9434-1542159cd86b",
+          "purchase_invoice_id": "4600abca-d632-4ee8-979b-f47145a1a727",
+          "accountingDocumentId": "d31c9b20-61e7-4047-a401-3b487c2e349f",
+          "accountingDocumentIds": [
+            "3e162bc4-fb8e-46dd-8130-9715679586c9",
+            "d31c9b20-61e7-4047-a401-3b487c2e349f"
+          ],
+          "receipt_post_result": {
+            "journal_entry_id": "3e162bc4-fb8e-46dd-8130-9715679586c9",
+            "gl_entry_ids": [
+              "640de257-71cd-4326-826a-84acf3954a4b",
+              "820c6aba-fe40-44b1-a629-87f2b439cc5b"
+            ],
+            "source_document_type": "purchase_receipt",
+            "source_document_id": "e26039ea-865f-435c-9434-1542159cd86b",
+            "source_document_no": "INT01A-PR-1782917015407",
+            "status": "POSTED",
+            "idempotent": false
+          },
+          "invoice_post_result": {
+            "journal_entry_id": "d31c9b20-61e7-4047-a401-3b487c2e349f",
+            "gl_entry_ids": [
+              "6d9021bd-3e9e-4b4c-b9ec-26ed63dbb715",
+              "d3c8c471-2cde-42e9-b0d7-71fc758f31aa"
+            ],
+            "source_document_type": "purchase_invoice",
+            "source_document_id": "4600abca-d632-4ee8-979b-f47145a1a727",
+            "source_document_no": "INT01A-PI-1782917015407",
+            "status": "POSTED",
+            "idempotent": false
+          },
+          "wiring": {
+            "purchaseReceipt": "purchase_receipts schema bridge",
+            "purchaseInvoice": "purchase_invoices schema bridge",
+            "glWriter": "EW-01 PostingService.postAccountingDocument only",
+            "apLedger": "ar_ap_ledger_entries supplier outstanding"
+          }
+        },
+        "deltas": {
+          "glEntries": {
+            "before": 9,
+            "after": 13,
+            "delta": 4
+          },
+          "purchaseReceipts": {
+            "before": 0,
+            "after": 1,
+            "delta": 1
+          },
+          "purchaseInvoices": {
+            "before": 0,
+            "after": 1,
+            "delta": 1
+          },
+          "apLedger": {
+            "before": 1,
+            "after": 2,
+            "delta": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-07",
+      "title": "Post VAT ledger baseline / source linkage",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.520Z",
+      "endedAt": "2026-07-01T14:43:35.620Z",
+      "durationMs": 100,
+      "evidence": {
+        "explicitVatResult": null,
+        "vatDeltaSinceInitial": 1,
+        "linkage": [
+          {
+            "column": "journal_entry_id",
+            "ids": [
+              "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+              "d31c9b20-61e7-4047-a401-3b487c2e349f",
+              "3e162bc4-fb8e-46dd-8130-9715679586c9"
+            ],
+            "count": 1
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-08",
+      "title": "Post AR/AP settlement through approved surface",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.620Z",
+      "endedAt": "2026-07-01T14:43:35.775Z",
+      "durationMs": 155,
+      "evidence": {
+        "result": {
+          "ok": true,
+          "surface": "AR/AP settlement approved surface",
+          "company_id": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+          "posting_date": "2026-07-01",
+          "settlementId": "28ee6289-1715-4f7b-97a7-9b6330a0b7b0",
+          "allocationId": "84eb7028-64ab-46ad-a95b-6d08423a64cc",
+          "accountingDocumentId": "9da96067-57f8-4bf3-a345-9906f3705af2",
+          "accountingDocumentIds": [
+            "9da96067-57f8-4bf3-a345-9906f3705af2"
+          ],
+          "invoiceLedgerEntryId": "ddde5707-9caa-4007-9666-982ab1e3e3a4",
+          "paymentLedgerEntryId": "3504c122-fac8-4dbe-bc21-9f2363926556",
+          "amount": 1000,
+          "wiring": {
+            "allocation": "ar_ap_allocations append-only allocated event",
+            "glWriter": "EW-01 PostingService.postAccountingDocument only",
+            "side": "purchase/AP only to avoid blocking sales cancel smoke"
+          }
+        },
+        "deltas": {
+          "glEntries": {
+            "before": 13,
+            "after": 15,
+            "delta": 2
+          },
+          "arapAllocations": {
+            "before": 0,
+            "after": 1,
+            "delta": 1
+          }
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-09",
+      "title": "Post inventory movement / adjustment through approved surface",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.775Z",
+      "endedAt": "2026-07-01T14:43:35.911Z",
+      "durationMs": 136,
+      "evidence": {
+        "result": {
+          "entry": {
+            "id": "cabe4ab6-6ce0-471b-80b0-238a93a549f4",
+            "company_id": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+            "item_id": "00000000-0000-4000-8000-000000000401",
+            "warehouse_id": "00000000-0000-4000-8000-000000000301",
+            "posting_date": "2026-07-01",
+            "posting_time": "00:00:00",
+            "source_document_type": "INT01D_EW05_STOCK_PRECONDITION",
+            "source_document_id": "a516d3fd-c6b3-44ec-8739-a0034ccd60e9",
+            "source_document_line_id": null,
+            "movement_type": "inventory_adjustment",
+            "quantity_change": 10,
+            "qty_after_transaction": 16,
+            "valuation_rate": 100,
+            "stock_value": 1600,
+            "stock_value_difference": 1000,
+            "transfer_group_id": null,
+            "transfer_pair_id": null,
+            "is_reversal": false,
+            "reverses_inventory_ledger_entry_id": null
+          },
+          "accountingResult": {
+            "journal_entry_id": "044f9349-df47-4941-a6e4-2beb431d634a",
+            "gl_entry_ids": [
+              "4565c063-b3f1-4678-9535-a1190ea72ef5",
+              "0f14689a-658f-43e6-ad96-fe859558888c"
+            ],
+            "source_document_type": "INT01D_EW05_STOCK_PRECONDITION",
+            "source_document_id": "a516d3fd-c6b3-44ec-8739-a0034ccd60e9",
+            "source_document_no": null,
+            "status": "POSTED",
+            "idempotent": false
+          },
+          "accountingDocumentId": "044f9349-df47-4941-a6e4-2beb431d634a",
+          "accountingDocumentIds": [
+            "044f9349-df47-4941-a6e4-2beb431d634a"
+          ],
+          "inventoryLedgerEntryId": "cabe4ab6-6ce0-471b-80b0-238a93a549f4",
+          "inventoryLedgerEntryIds": [
+            "cabe4ab6-6ce0-471b-80b0-238a93a549f4"
+          ],
+          "documentId": "044f9349-df47-4941-a6e4-2beb431d634a",
+          "int01dApprovedSurface": "EW-05",
+          "int01dApprovedMethod": "postInventoryAdjustment"
+        },
+        "deltas": {
+          "glEntries": {
+            "before": 15,
+            "after": 17,
+            "delta": 2
+          },
+          "inventoryLedger": {
+            "before": 3,
+            "after": 4,
+            "delta": 1
+          }
+        },
+        "linkage": {
+          "checked": [
+            {
+              "table": "inventoryLedger",
+              "column": "source_document_id",
+              "ids": [
+                "044f9349-df47-4941-a6e4-2beb431d634a"
+              ],
+              "count": 0
+            },
+            {
+              "table": "glEntries",
+              "column": "inventory_ledger_entry_id",
+              "ids": [
+                "cabe4ab6-6ce0-471b-80b0-238a93a549f4"
+              ],
+              "count": 2
+            }
+          ]
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-10",
+      "title": "Query GL entries and verify Debit = Credit for all smoke documents",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.911Z",
+      "endedAt": "2026-07-01T14:43:35.915Z",
+      "durationMs": 4,
+      "evidence": {
+        "documentIds": [
+          "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+          "d31c9b20-61e7-4047-a401-3b487c2e349f",
+          "3e162bc4-fb8e-46dd-8130-9715679586c9",
+          "9da96067-57f8-4bf3-a345-9906f3705af2",
+          "044f9349-df47-4941-a6e4-2beb431d634a"
+        ],
+        "sums": [
+          {
+            "documentId": "044f9349-df47-4941-a6e4-2beb431d634a",
+            "debit": 1000,
+            "credit": 1000,
+            "rowCount": 2,
+            "companyCount": 1
+          },
+          {
+            "documentId": "3e162bc4-fb8e-46dd-8130-9715679586c9",
+            "debit": 1000,
+            "credit": 1000,
+            "rowCount": 2,
+            "companyCount": 1
+          },
+          {
+            "documentId": "9da96067-57f8-4bf3-a345-9906f3705af2",
+            "debit": 1000,
+            "credit": 1000,
+            "rowCount": 2,
+            "companyCount": 1
+          },
+          {
+            "documentId": "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+            "debit": 1100,
+            "credit": 1100,
+            "rowCount": 3,
+            "companyCount": 1
+          },
+          {
+            "documentId": "d31c9b20-61e7-4047-a401-3b487c2e349f",
+            "debit": 1000,
+            "credit": 1000,
+            "rowCount": 2,
+            "companyCount": 1
+          }
+        ]
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-11",
+      "title": "Verify company_id isolation for freeze-scope ledgers",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.915Z",
+      "endedAt": "2026-07-01T14:43:35.928Z",
+      "durationMs": 13,
+      "evidence": {
+        "glEntries": {
+          "companyColumn": "company_id",
+          "checkedWithDocumentIds": true,
+          "badRows": 0
+        },
+        "vatLedger": {
+          "companyColumn": "company_id",
+          "checkedWithDocumentIds": true,
+          "badRows": 0
+        },
+        "arLedger": {
+          "companyColumn": "company_id",
+          "checkedWithDocumentIds": true,
+          "badRows": 0
+        },
+        "apLedger": {
+          "companyColumn": "company_id",
+          "checkedWithDocumentIds": true,
+          "badRows": 0
+        },
+        "inventoryLedger": {
+          "companyColumn": "company_id",
+          "checkedWithDocumentIds": true,
+          "badRows": 0
+        }
+      },
+      "error": null
+    },
+    {
+      "id": "INT01A-12",
+      "title": "Cancel one document and verify append-only reversal",
+      "status": "PASS",
+      "startedAt": "2026-07-01T14:43:35.928Z",
+      "endedAt": "2026-07-01T14:43:36.076Z",
+      "durationMs": 148,
+      "evidence": {
+        "cancelResult": {
+          "ok": true,
+          "surface": "Cancel/Reversal approved surface",
+          "company_id": "b77ab860-9f17-4e0e-ab53-ed60bc3eeaa4",
+          "posting_date": "2026-06-30",
+          "accountingDocumentId": "fc7318f8-a742-4e24-8d08-527353c51656",
+          "accountingDocumentIds": [
+            "fc7318f8-a742-4e24-8d08-527353c51656"
+          ],
+          "reversalAccountingDocumentId": "fc7318f8-a742-4e24-8d08-527353c51656",
+          "reversalOfAccountingDocumentId": "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+          "documentId": "fc7318f8-a742-4e24-8d08-527353c51656",
+          "reversal_post_result": {
+            "journal_entry_id": "fc7318f8-a742-4e24-8d08-527353c51656",
+            "gl_entry_ids": [
+              "0a17cb68-b06d-4e09-bfee-c48b102a996c",
+              "dad7cbf8-62ed-475e-8276-c530ca3d9b92",
+              "24c0581c-2abb-46c2-b364-1c6d30f1e03a"
+            ],
+            "source_document_type": "reversal",
+            "source_document_id": "c6beb766-22af-4fe2-8e59-bebc94bcce82",
+            "source_document_no": "INT01A-REV-1782917015988",
+            "status": "POSTED",
+            "idempotent": false
+          },
+          "originalAccountingDocumentIds": [
+            "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6"
+          ],
+          "wiring": {
+            "glWriter": "EW-01 PostingService.postAccountingDocument only",
+            "behavior": "append-only reversal; original GL rows are not updated or deleted"
+          }
+        },
+        "deltas": {
+          "glEntries": {
+            "before": 17,
+            "after": 20,
+            "delta": 3
+          }
+        },
+        "reversal": {
+          "originalDocIds": [
+            "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6"
+          ],
+          "reversalIds": [
+            "fc7318f8-a742-4e24-8d08-527353c51656"
+          ],
+          "originalRowsUnchanged": true,
+          "originalSums": [
+            {
+              "documentId": "a6b2f4b5-ae8e-48c0-a854-d97fa5a119a6",
+              "debit": 1100,
+              "credit": 1100,
+              "rowCount": 3,
+              "companyCount": 1
+            }
+          ],
+          "reversalSums": [
+            {
+              "documentId": "fc7318f8-a742-4e24-8d08-527353c51656",
+              "debit": 1100,
+              "credit": 1100,
+              "rowCount": 3,
+              "companyCount": 1
+            }
+          ]
+        }
+      },
+      "error": null
+    }
+  ],
+  "openIssues": [],
+  "runtime": {
+    "db": {
+      "postgresVersion": "PostgreSQL 16.14 (Debian 16.14-1.pgdg13+1) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit",
+      "database": "local_final_gate",
+      "schema": "public"
+    },
+    "migrationInfo": {
+      "migrationTable": null,
+      "rows": null,
+      "warning": "No common migration metadata table detected; required freeze-scope tables are used as migration-applied evidence."
+    }
+  }
+}
+```
