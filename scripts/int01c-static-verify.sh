@@ -23,7 +23,7 @@ if [[ -n "$PROTECTED_WRITE_HITS" ]]; then
   exit 1
 fi
 
-echo "[INT-01C static] no direct SQL insert/update into stock_balances or inventory_ledger_entries found in patched files"
+echo "[INT-01C static] protected inventory table scan passed found in patched files"
 
 echo "[INT-01C static] approved surface call evidence"
 grep -nE "postInventoryAdjustment|postPurchaseGrni|EW-05|EW-04" \

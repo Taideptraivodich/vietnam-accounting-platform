@@ -1,7 +1,7 @@
 cbe4b4a77a41b7c6dbe55dec2159a0657c9ba17e98731d410afd079446c11660 *./.env.integration.example
 59ec0935190449c11b113108a194a337e7defd46d988d8fccc5c6b76f0974b0b *./.env.integration.local
 68a04c5206994d0ce80099805ee6df772534b34a48462975e246182ab06cd1f6 *./.gitattributes
-8e4d93c498dbad4beb207e8ab5f054c3dda7a1f103ccb1b6095067f9ab4a018a *./.github/workflows/staging-ci.yml
+a427c0d850d8d8a710fface5f2b11fc09e80b7c0c3cd1e8f695d6c149984d259 *./.github/workflows/staging-ci.yml
 9b312fdded94ddd66f22731f291ddf4ec2b4096954cc520d7d19557d97c9efdf *./BRANCH_PROTECTION_RULES_v1_0_3.md
 b66fa5f203f3f8d7a9ae250d7fe2b988b5ed9400680f1a234dcec36d056e9e76 *./CLEAN_RERUN_COMMAND.md
 59d22146c789427a53998c1be074a5aa8869049262c9d007c7a37ff51d33bb72 *./EVIDENCE_CHECKLIST.md
@@ -352,7 +352,7 @@ ca000527da88af9bd9b3a605ab1223be361369dfaca2dfd2ea5b589de25197bf *./scripts/int0
 cdef5451d4eec9a9dab1d47bd8a40e6464228aeb0c0de9e0a7312b4cc6e13d8c *./scripts/int01b-verify-sales-delivery-wiring.mjs
 f53fd64539bf8c392999e790346a142caa41b65e2736eb6be377101dea65f27a *./scripts/int01b/int01b-verify-adapter-load.mjs
 c7a916a68bc4d20767fce85350cd819b74c2a2e4d828369f122b338da7a04816 *./scripts/int01c-runtime-verify.sh
-838550f44cecf826dcc6a11b22d998cf7c9c1870af37161f5b4b4f7d61ffd84e *./scripts/int01c-static-verify.sh
+baa10e5e0db3eb2b5b66d6d4c8e501d3e5a2a5a2d063420fd821d9327f348f0d *./scripts/int01c-static-verify.sh
 7792c50dab14cd96d7ffa80ee232a3c0f147f81014a70b0af2a4293d5e31ce37 *./scripts/int01d-runtime-verify.sh
 cd35ea5623a932f2745bb078c6f8ada3812a03920f355446e60f985ff67237d6 *./scripts/int01d-static-verify.sh
 74a909c27b8896c49ac020a553d9e2d99167b5c782f3d5c0114745d77257d9b7 *./scripts/organize_reports_history.sh

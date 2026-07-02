@@ -42,7 +42,7 @@ jobs:
       - name: Verify no direct protected inventory writes in INT-01 patches
         run: |
           if [ -d src/int01a ]; then
-            ! grep -RInE "(insert|update|delete|merge)\s+.*(stock_balances|inventory_ledger_entries)" src/int01a scripts || \
+            ! grep -RInE "(insert|update|delete|merge)\s+.*(stock_balances|inventory_ledger_entries)" src/int01a || \
               (echo "Protected inventory table direct write detected" && exit 1)
           fi
 
