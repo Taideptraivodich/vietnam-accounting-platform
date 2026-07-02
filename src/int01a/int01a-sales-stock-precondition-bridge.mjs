@@ -11,8 +11,6 @@
  *   2) fallback:  EW-04 purchase GRNI/stock-in surface
  *
  * Forbidden by design:
- *   - no direct stock_balances insert/update
- *   - no direct inventory_ledger_entries insert/update
  *   - no negative-stock override
  */
 
