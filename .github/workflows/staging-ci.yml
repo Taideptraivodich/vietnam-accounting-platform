@@ -1,0 +1,124 @@
+name: Staging CI v1.0.3
+
+on:
+  push:
+    branches:
+      - staging/v1.0.3-final-gate-pass
+  pull_request:
+    branches:
+      - staging/v1.0.3-final-gate-pass
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    name: Static checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Verify canonical PASS evidence exists
+        run: |
+          test -f INT01A_FINAL_PASS.json
+          test -f INT01A_FINAL_PASS.md
+          test -f NO_PRODUCTION_MERGE_STATEMENT.md
+
+      - name: Verify no direct protected inventory writes in INT-01 patches
+        run: |
+          if [ -d src/int01a ]; then
+            ! grep -RInE "(insert|update|delete|merge)\s+.*(stock_balances|inventory_ledger_entries)" src/int01a scripts || \
+              (echo "Protected inventory table direct write detected" && exit 1)
+          fi
+
+      - name: JavaScript syntax checks
+        run: |
+          if find . -path './node_modules' -prune -o -name '*.mjs' -print | grep -q .; then
+            find . -path './node_modules' -prune -o -name '*.mjs' -print0 | xargs -0 -n1 node --check
+          fi
+          if find . -path './node_modules' -prune -o -name '*.cjs' -print | grep -q .; then
+            find . -path './node_modules' -prune -o -name '*.cjs' -print0 | xargs -0 -n1 node --check
+          fi
+          if find . -path './node_modules' -prune -o -name '*.js' -print | grep -q .; then
+            find . -path './node_modules' -prune -o -name '*.js' -print0 | xargs -0 -n1 node --check
+          fi
+
+      - name: Shell syntax checks
+        run: |
+          if find scripts -name '*.sh' -print 2>/dev/null | grep -q .; then
+            find scripts -name '*.sh' -print0 | xargs -0 -n1 bash -n
+          fi
+
+      - name: TypeScript check if configured
+        run: |
+          if npm run | grep -qE '^  verify'; then
+            npm run verify
+          elif npm run | grep -qE '^  typecheck'; then
+            npm run typecheck
+          else
+            echo "No verify/typecheck script found; static syntax checks completed."
+          fi
+
+  postgres-smoke-precheck:
+    name: PostgreSQL smoke precheck
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: vap_user
+          POSTGRES_PASSWORD: vap_password
+          POSTGRES_DB: vap_integration
+        ports:
+          - 15432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgres://vap_user:vap_password@127.0.0.1:15432/vap_integration
+      NODE_ENV: integration
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install
+          fi
+
+      - name: Database connectivity
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          psql -d "$DATABASE_URL" -c 'select version();'
+
+      - name: Full gate command is manual until env IDs are regenerated
+        run: |
+          echo "PostgreSQL service reachable."
+          echo "Full INT-01A smoke remains manual unless MD01/EW01 preseed env IDs are generated inside CI."
