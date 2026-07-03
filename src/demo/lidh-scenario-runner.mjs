@@ -1,7 +1,8 @@
+
 import { randomUUID } from 'node:crypto';
 import { LOCAL_DEMO_BANNER, assertLocalInteractiveDemoEnabled } from './lidh-env-gate.mjs';
 import { loadApprovedDemoAdapter } from './lidh-adapter.mjs';
-import { collectDemoTrace, extractIdsFromResult } from './lidh-trace-readers.mjs';
+import { collectDemoTrace, extractIdsFromResult, readDemoStockSnapshot } from './lidh-trace-readers.mjs';
 
 export const DEMO_SCENARIOS = Object.freeze([
   {
@@ -43,7 +44,6 @@ function envFirst(...names) {
   }
   return undefined;
 }
-
 
 const LOCAL_DEMO_DEFAULTS = Object.freeze({
   customer_id: '00000000-0000-4000-8000-000000000101',
@@ -182,6 +182,136 @@ function targetFromPostedResult(type, result) {
   };
 }
 
+function emptyTrace() {
+  return { gl: [], journalEntries: [], ar: [], ap: [], arap: [], allocations: [], tax: [], inventory: [], stockBalances: [], source: {} };
+}
+
+function isSalesStockSensitiveScenario(slug) {
+  return ['sales-ar-vat-inventory-gl', 'ar-ap-settlement-visibility', 'cancel-reversal-verification'].includes(slug);
+}
+
+async function safeStockSnapshot({ companyId, itemId, warehouseId, label }) {
+  try {
+    return await readDemoStockSnapshot({ companyId, itemId, warehouseId, label });
+  } catch (error) {
+    return {
+      label,
+      table: 'stock_balances',
+      exists: undefined,
+      selector: { companyId, itemId, warehouseId },
+      rows: [],
+      summary: [],
+      warning: `Stock snapshot unavailable: ${error?.message || String(error)}`,
+    };
+  }
+}
+
+function isTraceVisibilityCheck(item) {
+  return /trace visible|trace present|stock balance cache/i.test(String(item?.name || '')) || item?.status === 'WARN';
+}
+
+function statusFromInvariant(invariants, pattern) {
+  const matches = (invariants || []).filter((item) => pattern.test(String(item.name || '')));
+  if (matches.some((item) => item.status === 'FAIL')) return 'FAIL';
+  if (matches.some((item) => item.status === 'PASS')) return 'PASS';
+  if (matches.some((item) => item.status === 'WARN')) return 'WARN';
+  return 'INFO';
+}
+
+function buildReviewReadiness({ scenario, status, invariants = [], sourceDocuments = [], trace = emptyTrace(), evidence = {}, error }) {
+  const failed = invariants.filter((item) => item.status === 'FAIL');
+  const warnings = invariants.filter((item) => item.status === 'WARN');
+  const scenarioAccountingStatus = failed.length ? 'FAIL' : 'PASS';
+  const traceVisibilityStatus = failed.length ? (warnings.length ? 'WARN' : 'PASS') : (warnings.length ? 'WARN' : 'PASS');
+  const nestedErrors = Array.isArray(error?.details?.errors) ? error.details.errors.map((item) => item.message).join(' ') : '';
+  const negativeStock = /negative stock/i.test(String(error?.message || '') + ' ' + nestedErrors);
+
+  const checklist = [
+    {
+      check: 'Scenario action completed',
+      status,
+      detail: error ? error.message : 'Approved surface returned without throwing an action error.',
+    },
+    {
+      check: 'Source document visible',
+      status: sourceDocuments.length ? 'PASS' : 'WARN',
+      detail: sourceDocuments.length ? `${sourceDocuments.length} source document row(s) summarized.` : 'No source document summary rows matched returned IDs/idempotency key.',
+    },
+    {
+      check: 'GL debit = credit',
+      status: statusFromInvariant(invariants, /^GL debit = credit/i),
+      detail: 'Any FAIL here is accounting-blocking.',
+    },
+    {
+      check: 'Company isolation',
+      status: statusFromInvariant(invariants, /company isolation/i),
+      detail: 'Rows must remain scoped to the selected company.',
+    },
+    {
+      check: 'AR/AP trace',
+      status: scenario === 'sales-ar-vat-inventory-gl'
+        ? ((trace.ar || []).length ? 'PASS' : 'WARN')
+        : scenario === 'purchase-grni'
+          ? ((trace.ap || []).length ? 'PASS' : 'WARN')
+          : scenario === 'ar-ap-settlement-visibility'
+            ? (((trace.allocations || []).length || (trace.arap || []).length) ? 'PASS' : 'WARN')
+            : 'INFO',
+      detail: 'WARN means the trace reader did not find enough visible subledger rows for review.',
+    },
+    {
+      check: 'VAT/tax trace',
+      status: ['sales-ar-vat-inventory-gl', 'purchase-grni'].includes(scenario) ? ((trace.tax || []).length ? 'PASS' : 'WARN') : 'INFO',
+      detail: 'Visible tax ledger rows are needed for accounting review, but WARN does not by itself mean GL failure.',
+    },
+    {
+      check: 'Inventory movement / stock trace',
+      status: /sales|purchase|inventory/.test(scenario)
+        ? (((trace.inventory || []).length || (trace.stockBalances || []).length || evidence.stockBalanceAfter) ? 'PASS' : 'WARN')
+        : 'INFO',
+      detail: 'Stock before/after is captured separately for Sales-sensitive scenarios.',
+    },
+    {
+      check: 'Cancel/reversal append-only evidence',
+      status: scenario === 'cancel-reversal-verification'
+        ? (statusFromInvariant(invariants, /reversal journal trace/i) === 'PASS' ? 'PASS' : 'WARN')
+        : 'INFO',
+      detail: 'WARN means reversal action completed but reversal journal trace needs clearer mapping.',
+    },
+    {
+      check: 'Stock before/after captured',
+      status: evidence.stockSensitiveScenario ? ((evidence.stockBalanceBefore || evidence.stockBalanceAfter) ? 'PASS' : 'WARN') : 'INFO',
+      detail: evidence.stockSensitiveScenario ? 'Useful for repeated Sales demo review and negative-stock explanation.' : 'Not a Sales stock-sensitive scenario.',
+    },
+  ];
+
+  const guidance = [
+    'Controlled internal demo only — not UAT and not production.',
+    'Scenario accounting status is PASS when no FAIL accounting invariant is present.',
+    'Trace visibility WARN means evidence/readiness needs improvement; it is not automatically an accounting core failure.',
+  ];
+
+  if (evidence.stockSensitiveScenario) {
+    guidance.push('Repeated Sales-based runs consume demo stock. If stock is exhausted, negative-stock protection may correctly block the run.');
+  }
+  if (negativeStock) {
+    guidance.push('This run hit negative-stock protection. That is expected inventory control behavior after demo stock is exhausted; reset the disposable DB or top up stock through the approved inventory adjustment surface.');
+  }
+  if (warnings.length) {
+    guidance.push('Review WARN rows as UI/trace readiness feedback for Session #2.');
+  }
+
+  return {
+    scenarioAccountingStatus,
+    traceVisibilityStatus,
+    failedInvariantCount: failed.length,
+    traceWarningCount: warnings.length,
+    accountingChecks: invariants.filter((item) => !isTraceVisibilityCheck(item)),
+    traceVisibilityChecks: invariants.filter((item) => isTraceVisibilityCheck(item)),
+    checklist,
+    guidance,
+  };
+}
+
 export async function runLocalDemoScenario({ scenarioSlug, companyId, body = {} }) {
   const gate = assertLocalInteractiveDemoEnabled();
   const scenario = getScenario(scenarioSlug);
@@ -198,10 +328,32 @@ export async function runLocalDemoScenario({ scenarioSlug, companyId, body = {} 
   const startedAt = new Date().toISOString();
   const warnings = [...gate.warnings, LOCAL_DEMO_BANNER];
   const actionResults = [];
+  const evidence = {
+    scenarioInputs: {
+      companyId: ctx.companyId,
+      itemId: ctx.itemId,
+      warehouseId: ctx.warehouseId,
+      quantity: ctx.quantity,
+      unitPrice: ctx.unitPrice,
+      taxRate: ctx.taxRate,
+      currency: ctx.currency,
+      postingDate: ctx.postingDate,
+    },
+    stockSensitiveScenario: isSalesStockSensitiveScenario(scenario.slug),
+  };
 
   try {
     const { adapter, specifier } = await loadApprovedDemoAdapter();
     warnings.push(`Approved adapter: ${specifier}`);
+
+    if (evidence.stockSensitiveScenario) {
+      evidence.stockBalanceBefore = await safeStockSnapshot({
+        companyId: ctx.companyId,
+        itemId: ctx.itemId,
+        warehouseId: ctx.warehouseId,
+        label: 'before scenario',
+      });
+    }
 
     if (scenario.slug === 'sales-ar-vat-inventory-gl') {
       actionResults.push({ step: 'postSalesDelivery', result: await callSurface(adapter, 'postSalesDelivery', ctx) });
@@ -221,9 +373,26 @@ export async function runLocalDemoScenario({ scenarioSlug, companyId, body = {} 
       actionResults.push({ step: 'postSalesDelivery', result: sales }, { step: 'cancelDocument', result: reversal });
     }
 
+    if (evidence.stockSensitiveScenario) {
+      evidence.stockBalanceAfter = await safeStockSnapshot({
+        companyId: ctx.companyId,
+        itemId: ctx.itemId,
+        warehouseId: ctx.warehouseId,
+        label: 'after scenario',
+      });
+    }
+
     const trace = await collectDemoTrace({ companyId: ctx.companyId, runId, scenario: scenario.slug, actionResults });
     const failedInvariants = trace.invariants.filter((item) => item.status === 'FAIL');
     const status = failedInvariants.length ? 'FAIL' : 'PASS';
+    const review = buildReviewReadiness({
+      scenario: scenario.slug,
+      status,
+      invariants: trace.invariants,
+      sourceDocuments: trace.sourceDocuments,
+      trace: trace.trace,
+      evidence,
+    });
 
     return {
       status,
@@ -239,9 +408,32 @@ export async function runLocalDemoScenario({ scenarioSlug, companyId, body = {} 
       trace: trace.trace,
       invariants: trace.invariants,
       readModel: trace.readModel,
+      evidence,
+      review,
       warnings,
     };
   } catch (error) {
+    if (evidence.stockSensitiveScenario && !evidence.stockBalanceAfter) {
+      evidence.stockBalanceAfter = await safeStockSnapshot({
+        companyId: ctx.companyId,
+        itemId: ctx.itemId,
+        warehouseId: ctx.warehouseId,
+        label: 'after failed scenario',
+      });
+    }
+    const normalizedError = normalizeError(error);
+    const trace = emptyTrace();
+    const invariants = [{ name: 'Scenario action completed', status: 'FAIL', error: normalizedError }];
+    const review = buildReviewReadiness({
+      scenario: scenario.slug,
+      status: 'FAIL',
+      invariants,
+      sourceDocuments: [],
+      trace,
+      evidence,
+      error: normalizedError,
+    });
+
     return {
       status: 'FAIL',
       scenario: scenario.slug,
@@ -253,10 +445,13 @@ export async function runLocalDemoScenario({ scenarioSlug, companyId, body = {} 
       banner: LOCAL_DEMO_BANNER,
       sourceDocuments: [],
       actionResults,
-      trace: { gl: [], journalEntries: [], ar: [], ap: [], arap: [], allocations: [], tax: [], inventory: [], stockBalances: [], source: {} },
-      invariants: [{ name: 'Scenario action completed', status: 'FAIL', error: normalizeError(error) }],
+      trace,
+      invariants,
+      readModel: { ids: {}, tables: {} },
+      evidence,
+      review,
       warnings,
-      error: normalizeError(error),
+      error: normalizedError,
     };
   }
 }

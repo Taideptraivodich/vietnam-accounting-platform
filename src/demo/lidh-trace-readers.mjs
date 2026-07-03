@@ -301,6 +301,129 @@ export function buildInvariants({ companyId, trace, scenario }) {
   return invariants;
 }
 
+
+function firstPresent(row, names) {
+  for (const name of names) {
+    if (Object.prototype.hasOwnProperty.call(row || {}, name) && row[name] !== null && row[name] !== undefined) return row[name];
+  }
+  return null;
+}
+
+function stockQuantity(row) {
+  return firstPresent(row, [
+    'quantity_on_hand',
+    'qty_on_hand',
+    'on_hand_quantity',
+    'balance_quantity',
+    'quantity_balance',
+    'current_quantity',
+    'quantity',
+    'qty',
+  ]);
+}
+
+function stockValue(row) {
+  return firstPresent(row, [
+    'inventory_value',
+    'value_on_hand',
+    'balance_value',
+    'current_value',
+    'total_value',
+    'amount',
+  ]);
+}
+
+function stockAverageCost(row) {
+  return firstPresent(row, [
+    'moving_average_cost',
+    'average_cost',
+    'avg_cost',
+    'unit_cost',
+  ]);
+}
+
+function summarizeStockRows(rows) {
+  return (rows || []).map((row) => ({
+    id: row.id || null,
+    company_id: row.company_id || null,
+    item_id: row.item_id || row.inventory_item_id || null,
+    warehouse_id: row.warehouse_id || null,
+    quantity: stockQuantity(row),
+    value: stockValue(row),
+    averageCost: stockAverageCost(row),
+    updatedAt: row.updated_at || row.created_at || null,
+  }));
+}
+
+export async function readDemoStockSnapshot({ companyId, itemId, warehouseId, label = 'stock' }) {
+  const pool = createPgPool();
+  const client = await pool.connect();
+  try {
+    await queryReadOnly(client, 'select 1');
+
+    const table = TRACE_TABLES.stockBalances;
+    const selector = { companyId, itemId, warehouseId };
+    if (!(await tableExists(client, table))) {
+      return { label, table, exists: false, selector, rows: [], summary: [], warning: 'stock_balances table does not exist' };
+    }
+
+    const columns = await columnSet(client, table);
+    const parts = [];
+    const params = [];
+
+    const addEq = (column, value) => {
+      if (!columns.has(column) || value === undefined || value === null || value === '') return;
+      params.push(String(value));
+      parts.push(`${quoteIdent(column)}::text = $${params.length}`);
+    };
+
+    addEq('company_id', companyId);
+
+    const itemColumns = ['item_id', 'inventory_item_id'].filter((column) => columns.has(column));
+    if (itemId && itemColumns.length) {
+      params.push(String(itemId));
+      const paramIndex = params.length;
+      parts.push(`(${itemColumns.map((column) => `${quoteIdent(column)}::text = $${paramIndex}`).join(' or ')})`);
+    }
+
+    addEq('warehouse_id', warehouseId);
+
+    if (!parts.length) {
+      return {
+        label,
+        table,
+        exists: true,
+        selector,
+        rows: [],
+        summary: [],
+        columns: [...columns].sort(),
+        warning: 'No usable company/item/warehouse columns found for stock snapshot selection',
+      };
+    }
+
+    const orderColumn = columns.has('updated_at') ? 'updated_at' : (columns.has('created_at') ? 'created_at' : (columns.has('id') ? 'id' : [...columns][0]));
+    params.push(20);
+    const result = await queryReadOnly(
+      client,
+      `select * from ${quoteIdent(table)} where ${parts.join(' and ')} order by ${quoteIdent(orderColumn)} desc limit $${params.length}`,
+      params,
+    );
+
+    return {
+      label,
+      table,
+      exists: true,
+      selector,
+      rows: result.rows,
+      summary: summarizeStockRows(result.rows),
+      columns: [...columns].sort(),
+    };
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
 export async function collectDemoTrace({ companyId, runId, scenario, actionResults = [] }) {
   const pool = createPgPool();
   const client = await pool.connect();

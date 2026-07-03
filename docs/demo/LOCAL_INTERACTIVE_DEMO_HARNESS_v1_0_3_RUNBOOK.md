@@ -105,3 +105,32 @@ DEMO_INTERACTIVE_ENABLED=true NODE_ENV=development npm run demo:local
 ```
 
 Then rerun the project Final Integration Gate v1.0.3 and INT01A/INT01D checks using the existing repo protocol.
+
+## v1.0.3a Trace/UI Readiness Clarification
+
+Session #1 is classified as:
+
+```text
+PASS WITH ISSUES / CONTROLLED SMOKE ONLY
+Full accounting business validation: NOT COMPLETED
+End-user UAT: NOT OPENED
+Production: NOT ALLOWED
+```
+
+v1.0.3a keeps the same approved write boundary and adds UI/evidence clarity only:
+
+- Separates scenario action/accounting status from trace visibility warnings.
+- Keeps `WARN` as review/readiness feedback, not as automatic accounting failure.
+- Captures Sales-sensitive stock balance before/after using read-only trace queries.
+- Adds reviewer checklist for source document, GL balance, company isolation, AR/AP, VAT, inventory, and reversal evidence.
+- Disables scenario buttons while a scenario is running to reduce duplicate-click/race behavior.
+- Adds guidance that repeated Sales-based runs consume demo stock and may correctly trigger negative-stock protection.
+
+This patch does not change:
+
+- Accounting core behavior.
+- Negative stock blocking.
+- Approved adapter behavior.
+- Migrations.
+- Production deployment behavior.
+
