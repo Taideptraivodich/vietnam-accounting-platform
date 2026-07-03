@@ -18,7 +18,11 @@
     "test:ew06": "node --test test/*.test.js",
     "int01a:smoke": "node ./src/int01a/int01a-smoke-runner.mjs",
     "migrate:local:crlf-safe": "MIGRATION_ORDER_FILE=migrations/MIGRATION_ORDER.txt MIGRATION_ROOT=. bash scripts/apply_ordered_migrations_crlf_safe.sh",
-    "md01:seed": "bash scripts/run_md01_seed.sh"
+    "md01:seed": "bash scripts/run_md01_seed.sh",
+    "demo:local": "node ./scripts/lidh-demo-server.mjs",
+    "demo:guardrail": "node ./scripts/lidh-protected-write-guardrail.mjs",
+    "demo:smoke": "node ./scripts/lidh-smoke-test.mjs",
+    "demo:smoke:actions": "node ./scripts/lidh-smoke-test.mjs --run-actions"
   },
   "engines": {
     "node": ">=20"
@@ -41,6 +45,7 @@
     "No business rules, API contracts, or database schemas beyond package SQL files were changed.",
     "INT-01A runner installed from P0 remediation package.",
     "MD01/EW01 deterministic preseed upgraded to v1.1 account_subtype patch.",
-    "INT-01B approved surface adapter installed."
+    "INT-01B approved surface adapter installed.",
+    "LIDH v1.0.3 local-only demo harness scripts added; no production deployment behavior changed."
   ]
 }
