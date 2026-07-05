@@ -183,7 +183,7 @@ function targetFromPostedResult(type, result) {
 }
 
 function emptyTrace() {
-  return { gl: [], journalEntries: [], ar: [], ap: [], arap: [], allocations: [], tax: [], inventory: [], stockBalances: [], source: {} };
+  return { gl: [], journalEntries: [], ar: [], ap: [], arap: [], allocations: [], tax: [], inventory: [], stockBalances: [], mappingRows: [], source: {} };
 }
 
 function isSalesStockSensitiveScenario(slug) {
@@ -221,10 +221,23 @@ function statusFromInvariant(invariants, pattern) {
 function buildReviewReadiness({ scenario, status, invariants = [], sourceDocuments = [], trace = emptyTrace(), evidence = {}, error }) {
   const failed = invariants.filter((item) => item.status === 'FAIL');
   const warnings = invariants.filter((item) => item.status === 'WARN');
+  const traceMappingRows = Array.isArray(trace.mappingRows) ? trace.mappingRows : [];
+  const traceMappingWarnings = traceMappingRows.filter((item) => item.status === 'WARN');
   const scenarioAccountingStatus = failed.length ? 'FAIL' : 'PASS';
-  const traceVisibilityStatus = failed.length ? (warnings.length ? 'WARN' : 'PASS') : (warnings.length ? 'WARN' : 'PASS');
+  const traceVisibilityStatus = failed.length
+    ? (warnings.length || traceMappingWarnings.length ? 'WARN' : 'PASS')
+    : (traceMappingWarnings.length ? 'WARN' : 'PASS');
   const nestedErrors = Array.isArray(error?.details?.errors) ? error.details.errors.map((item) => item.message).join(' ') : '';
   const negativeStock = /negative stock/i.test(String(error?.message || '') + ' ' + nestedErrors);
+
+  const mappingStatus = (area, fallback = 'INFO') => {
+    const matches = traceMappingRows.filter((item) => String(item.area || '') === area);
+    if (!matches.length) return fallback;
+    if (matches.some((item) => item.status === 'FAIL')) return 'FAIL';
+    if (matches.some((item) => item.status === 'WARN')) return 'WARN';
+    if (matches.some((item) => item.status === 'PASS')) return 'PASS';
+    return 'INFO';
+  };
 
   const checklist = [
     {
@@ -250,30 +263,30 @@ function buildReviewReadiness({ scenario, status, invariants = [], sourceDocumen
     {
       check: 'AR/AP trace',
       status: scenario === 'sales-ar-vat-inventory-gl'
-        ? ((trace.ar || []).length ? 'PASS' : 'WARN')
+        ? mappingStatus('ar', (trace.ar || []).length ? 'PASS' : 'WARN')
         : scenario === 'purchase-grni'
-          ? ((trace.ap || []).length ? 'PASS' : 'WARN')
+          ? mappingStatus('ap', (trace.ap || []).length ? 'PASS' : 'WARN')
           : scenario === 'ar-ap-settlement-visibility'
-            ? (((trace.allocations || []).length || (trace.arap || []).length) ? 'PASS' : 'WARN')
+            ? mappingStatus('arap', ((trace.allocations || []).length || (trace.arap || []).length) ? 'PASS' : 'WARN')
             : 'INFO',
       detail: 'WARN means the trace reader did not find enough visible subledger rows for review.',
     },
     {
       check: 'VAT/tax trace',
-      status: ['sales-ar-vat-inventory-gl', 'purchase-grni'].includes(scenario) ? ((trace.tax || []).length ? 'PASS' : 'WARN') : 'INFO',
+      status: ['sales-ar-vat-inventory-gl', 'purchase-grni'].includes(scenario) ? mappingStatus('tax', (trace.tax || []).length ? 'PASS' : 'WARN') : 'INFO',
       detail: 'Visible tax ledger rows are needed for accounting review, but WARN does not by itself mean GL failure.',
     },
     {
       check: 'Inventory movement / stock trace',
       status: /sales|purchase|inventory/.test(scenario)
-        ? (((trace.inventory || []).length || (trace.stockBalances || []).length || evidence.stockBalanceAfter) ? 'PASS' : 'WARN')
+        ? (mappingStatus('inventory', mappingStatus('stockBalances', ((trace.inventory || []).length || (trace.stockBalances || []).length || evidence.stockBalanceAfter) ? 'PASS' : 'WARN')))
         : 'INFO',
       detail: 'Stock before/after is captured separately for Sales-sensitive scenarios.',
     },
     {
       check: 'Cancel/reversal append-only evidence',
       status: scenario === 'cancel-reversal-verification'
-        ? (statusFromInvariant(invariants, /reversal journal trace/i) === 'PASS' ? 'PASS' : 'WARN')
+        ? mappingStatus('reversal', (statusFromInvariant(invariants, /reversal journal trace/i) === 'PASS' ? 'PASS' : 'WARN'))
         : 'INFO',
       detail: 'WARN means reversal action completed but reversal journal trace needs clearer mapping.',
     },
@@ -307,6 +320,7 @@ function buildReviewReadiness({ scenario, status, invariants = [], sourceDocumen
     traceWarningCount: warnings.length,
     accountingChecks: invariants.filter((item) => !isTraceVisibilityCheck(item)),
     traceVisibilityChecks: invariants.filter((item) => isTraceVisibilityCheck(item)),
+    traceMappingRows,
     checklist,
     guidance,
   };

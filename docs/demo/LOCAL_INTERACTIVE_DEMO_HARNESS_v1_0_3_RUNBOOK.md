@@ -134,3 +134,43 @@ This patch does not change:
 - Migrations.
 - Production deployment behavior.
 
+
+## v1.0.3b trace mapping readiness notes
+
+`v1.0.3b` keeps the harness local-only and keeps accounting core behavior unchanged.
+
+Additional reviewer-facing evidence:
+
+```text
+Trace mapping evidence
+- Concrete trace rows when the read model exposes them
+- Explicit INFO/N/A mapping rows when the local read model does not expose a direct subledger/reversal marker
+- Separate Action PASS, Accounting PASS, and Trace visibility status
+```
+
+Targeted improvements:
+
+```text
+Sales:
+- AR mapping now shows customer AR rows when available or an explicit source-invoice/GL mapping reason.
+- VAT mapping uses tax ledger rows when available or source invoice VAT amount as explicit reviewer evidence.
+- Inventory mapping uses inventory ledger rows when available or delivery/stock evidence as explicit reviewer evidence.
+
+Inventory:
+- Source/action, GL, inventory movement, and stock-balance sections now show concrete rows or explicit N/A/read-model reasons.
+
+Cancel/Reversal:
+- Original source document, cancelDocument result, reversal marker, and append-only evidence are separated for reviewer reading.
+- Missing reversal markers are shown as INFO/read-model mapping notes rather than being confused with accounting failure.
+```
+
+Guardrail unchanged:
+
+```text
+Production: NOT ALLOWED
+UAT: NOT OPENED
+Main merge: NOT ALLOWED
+Accounting core: NOT CHANGED
+Negative stock rule: NOT CHANGED
+```
+

@@ -36,7 +36,7 @@ export function renderDemoPage({ gate }) {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Local Interactive Demo Harness v1.0.3a</title>
+  <title>Local Interactive Demo Harness v1.0.3b</title>
   <style>
     :root { font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #172033; background: #f6f7fb; }
     body { margin: 0; }
@@ -78,7 +78,7 @@ export function renderDemoPage({ gate }) {
 </head>
 <body>
   <header>
-    <h1>Local Interactive Demo Harness v1.0.3a</h1>
+    <h1>Local Interactive Demo Harness v1.0.3b</h1>
   </header>
   <main>
     <div class="banner">${escapeHtml(LOCAL_DEMO_BANNER)}</div>
@@ -124,6 +124,11 @@ export function renderDemoPage({ gate }) {
     <section class="panel" style="margin-top: 18px;">
       <h2>Stock / input evidence</h2>
       <div id="stockEvidence">—</div>
+    </section>
+    <section class="panel" style="margin-top: 18px;">
+      <h2>Trace mapping evidence</h2>
+      <div class="muted">Concrete trace rows are preferred. INFO rows provide explicit N/A/read-model mapping reasons for reviewer follow-up.</div>
+      <div id="mappingEvidence">—</div>
     </section>
     <section class="panel" style="margin-top: 18px;">
       <h2>Source document summary</h2>
@@ -209,6 +214,21 @@ export function renderDemoPage({ gate }) {
         '<div class="note">Repeated Sales, settlement, and cancel/reversal runs may consume demo stock. If Sales fails with negative-stock protection after repeated runs, reset the disposable DB or intentionally top up stock through the approved inventory adjustment surface.</div>';
     }
 
+    function traceMappingRows(result) {
+      return (result.review && Array.isArray(result.review.traceMappingRows))
+        ? result.review.traceMappingRows
+        : ((result.trace && Array.isArray(result.trace.mappingRows)) ? result.trace.mappingRows : []);
+    }
+
+    function tracePanel(trace, key, mappingRows, areas) {
+      const rows = trace[key] || [];
+      if (rows.length) return table(rows);
+      const areaList = Array.isArray(areas) ? areas : [areas];
+      const mapped = mappingRows.filter((row) => areaList.includes(row.area));
+      if (mapped.length) return table(mapped);
+      return '<span class="muted">No rows returned and no explicit mapping reason was supplied.</span>';
+    }
+
     function showResult(result) {
       const review = result.review || {};
       const fallback = classifyFromInvariants(result.invariants || []);
@@ -233,16 +253,18 @@ export function renderDemoPage({ gate }) {
       ]);
 
       document.getElementById('stockEvidence').innerHTML = renderStockEvidence(result);
+      const mappingRows = traceMappingRows(result);
+      document.getElementById('mappingEvidence').innerHTML = table(mappingRows);
       document.getElementById('sourceDocs').innerHTML = table(result.sourceDocuments || []);
       document.getElementById('invariants').innerHTML = table(result.invariants || []);
 
       const trace = result.trace || {};
-      document.getElementById('glTrace').innerHTML = table(trace.gl || []);
-      document.getElementById('arTrace').innerHTML = table(trace.ar || []);
-      document.getElementById('apTrace').innerHTML = table(trace.ap || []);
-      document.getElementById('taxTrace').innerHTML = table(trace.tax || []);
-      document.getElementById('inventoryTrace').innerHTML = table(trace.inventory || []);
-      document.getElementById('stockTrace').innerHTML = table(trace.stockBalances || []);
+      document.getElementById('glTrace').innerHTML = tracePanel(trace, 'gl', mappingRows, ['gl']);
+      document.getElementById('arTrace').innerHTML = tracePanel(trace, 'ar', mappingRows, ['ar', 'arap']);
+      document.getElementById('apTrace').innerHTML = tracePanel(trace, 'ap', mappingRows, ['ap', 'arap']);
+      document.getElementById('taxTrace').innerHTML = tracePanel(trace, 'tax', mappingRows, ['tax']);
+      document.getElementById('inventoryTrace').innerHTML = tracePanel(trace, 'inventory', mappingRows, ['inventory', 'inventory_source']);
+      document.getElementById('stockTrace').innerHTML = tracePanel(trace, 'stockBalances', mappingRows, ['stockBalances', 'inventory']);
       document.getElementById('trace').textContent = JSON.stringify(trace, null, 2);
       document.getElementById('raw').textContent = JSON.stringify({
         runId: result.runId,
