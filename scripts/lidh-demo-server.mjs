@@ -85,5 +85,5 @@ const host = process.env.LIDH_HOST || '127.0.0.1';
 const port = Number(process.env.LIDH_PORT || 3000);
 server.listen(port, host, () => {
   // eslint-disable-next-line no-console
-  console.log(`Local Interactive Demo Harness v1.0.3a listening on http://${host}:${port}/demo/internal`);
+  console.log(`Local Interactive Demo Harness v1.0.3b listening on http://${host}:${port}/demo/internal`);
 });
